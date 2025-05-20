@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LLM Classifier Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .settings {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .toggle-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 20px 0;
+        }
+        .button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        select, input {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .step-container {
+            text-align: center;
+            padding: 40px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            margin: 40px auto;
+            max-width: 600px;
+        }
+        .error-message {
+            color: #d32f2f;
+            margin: 10px 0;
+            display: none;
+        }
+        .steps {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        .step {
+            padding: 10px 20px;
+            margin: 0 10px;
+            background: #ddd;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+        .step.active {
+            background: #4CAF50;
+            color: white;
+        }
+        .step.completed {
+            background: #81C784;
+            color: white;
+        }
+        .stats-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .stat-box {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .stat-box h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        
+        .stat-box p {
+            margin: 5px 0;
+            color: #495057;
+        }
+        
+        .model-cost {
+            margin: 10px 0;
+            padding: 10px;
+            background: #fff;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .model-cost h5 {
+            margin: 0 0 5px 0;
+            color: #2c3e50;
+        }
+        
+        .cost-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .cost-section {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .cost-section h6 {
+            margin: 0 0 5px 0;
+            color: #2c3e50;
+            font-size: 0.9em;
+        }
+        
+        .cost-section p {
+            margin: 3px 0;
+            font-size: 0.9em;
+        }
+        
+        .total-cost {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e9ecef;
+            text-align: right;
+        }
+        
+        .total-cost p {
+            margin: 5px 0;
+        }
+        
+        select {
+            font-size: 0.9em;
+            padding: 8px;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .preview-box, .template-box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #f0f0f0;
+            cursor: pointer;
+        }
+
+        .tab-button.active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .preview-content {
+            display: none;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+
+        .preview-content.active {
+            display: block;
+        }
+
+        .template-controls {
+            margin-bottom: 15px;
+        }
+
+        .prompt-preview {
+            margin-top: 20px;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .prompt-preview .preview-content {
+            display: block;
+            margin-top: 10px;
+        }
+
+        .preview-content .csv-data {
+            font-style: italic;
+            color: #4CAF50;
+        }
+
+        .settings-top {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .settings-top > div {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .settings-top label {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .settings-top input,
+        .settings-top select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .settings-top .button {
+            align-self: flex-start;
+            margin-top: 5px;
+        }
+
+        .settings-top .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .settings-top .input-group input {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>LLM Classifier Dashboard</h1>
+
+    <!-- Progress Steps -->
+    <div class="steps">
+        <div class="step {% if step == 'upload' %}active{% elif step in ['select_column', 'dashboard'] %}completed{% endif %}">
+            1. Upload CSV
+        </div>
+        <div class="step {% if step == 'select_column' %}active{% elif step == 'dashboard' %}completed{% endif %}">
+            2. Select Column
+        </div>
+        <div class="step {% if step == 'dashboard' %}active{% endif %}">
+            3. Configure & Process
+        </div>
+    </div>
+
+    {% if step == 'upload' %}
+    <div class="step-container">
+        <h2>Upload CSV File</h2>
+        <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data">
+            <input type="file" name="csv_file" accept=".csv" required>
+            <button type="submit" class="button">Upload</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if step == 'select_column' %}
+    <div class="step-container">
+        <h2>Select Column to Process</h2>
+        <select id="column-select">
+            {% for column in columns %}
+            <option value="{{ column }}">{{ column }}</option>
+            {% endfor %}
+        </select>
+        <button onclick="updateColumn()" class="button">Continue</button>
+    </div>
+    {% endif %}
+
+    {% if step == 'dashboard' %}
+    <!-- Top Section: API Key and Model Selection -->
+    <div class="settings-top">
+        <div>
+            <label>API Key:</label>
+            <div class="input-group">
+                <input type="text" id="api-key" value="{{ api_key }}" placeholder="Enter OpenAI API Key">
+                <button onclick="updateApiKey()" class="button">Update API Key</button>
+            </div>
+        </div>
+        <div>
+            <label>Model:</label>
+            <select id="model-select" onchange="updateModel()">
+                {% for model_id, info in models.items() %}
+                <option value="{{ model_id }}" {% if model == model_id %}selected{% endif %}>
+                    {{ info.display_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Dataset Stats -->
+    <div class="stats-container">
+        <h2>Dataset Statistics</h2>
+        {% if stats %}
+        <div class="stats-grid">
+            <div class="stat-box">
+                <h4>Basic Stats</h4>
+                <p>Total Rows: {{ stats.row_count }}</p>
+                <p>Average Characters: {{ stats.mean_chars }}</p>
+                <p>Median Characters: {{ stats.median_chars }}</p>
+                <p>Total Characters: {{ stats.total_chars }}</p>
+            </div>
+            
+            {% for model, cost in stats.costs.items() %}
+            <div class="stat-box model-cost">
+                <h5>{{ cost.display_name }}</h5>
+                <div class="cost-grid">
+                    <div class="cost-section">
+                        <h6>Input Costs (per 1M tokens)</h6>
+                        <p>Regular: ${{ "%.2f"|format(cost.input_price * 1000) }}</p>
+                        <p>Cached: ${{ "%.2f"|format(cost.cached_input_price * 1000) }}</p>
+                    </div>
+                    <div class="cost-section">
+                        <h6>Output Cost (per 1M tokens)</h6>
+                        <p>${{ "%.2f"|format(cost.output_price * 1000) }}</p>
+                    </div>
+                </div>
+                <div class="total-cost">
+                    <p>Total Cost (Regular): ${{ cost.estimated_total_cost }}</p>
+                    <p>Total Cost (Cached): ${{ cost.estimated_total_cost_cached }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Mode Selection -->
+    <div class="toggle-container">
+        <button class="button" onclick="updateMode('summarize')">Summarization Mode</button>
+        <button class="button" onclick="updateMode('classify')">Classification Mode</button>
+    </div>
+
+    <!-- Middle Section: Column Preview and Prompt Template -->
+    <div class="content-grid">
+        <!-- Left Side: Column Preview with Tabs -->
+        <div class="preview-box">
+            <h3>CSV Data Preview</h3>
+            <div class="tabs">
+                {% for i in range(5) %}
+                <button class="tab-button {% if loop.first %}active{% endif %}" onclick="showTab({{ i }})">Entry {{ i + 1 }}</button>
+                {% endfor %}
+            </div>
+            {% if preview_data %}
+                {% for i in range(5) %}
+                <div class="preview-content {% if loop.first %}active{% endif %}" id="tab-{{ i }}">
+                    {{ preview_data[i] if preview_data|length > i else 'No data available' }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <!-- Right Side: Prompt Template -->
+        <div class="template-box">
+            <h3>Prompt Template</h3>
+            <div class="template-controls">
+                <select id="template-select" onchange="updatePromptTemplate()">
+                    {% for key, template in sample_prompts.items() %}
+                    <option value="{{ key }}" {% if key not in ['default', session.get('mode', 'summarize'), 'job_description'] %}class="mode-specific"{% endif %}>
+                        {{ template.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <textarea id="custom-prompt">{{ prompt_template }}</textarea>
+        </div>
+    </div>
+
+    <!-- Bottom Section: Full Prompt Preview -->
+    <div class="prompt-preview">
+        <h3>Full Prompt Preview</h3>
+        <div class="preview-content">
+            {{ prompt_preview|replace(preview_data[0] if preview_data else '', '<span class="csv-data">' + (preview_data[0] if preview_data else '') + '</span>')|safe if prompt_preview else 'No preview available' }}
+        </div>
+    </div>
+
+    <!-- Process Button -->
+    <div class="settings">
+        <button onclick="processData()" class="button">Process Data</button>
+    </div>
+    {% endif %}
+
+    <script>
+        function updateApiKey() {
+            const apiKey = document.getElementById('api-key').value;
+            fetch('/update_api_key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ api_key: apiKey })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error updating API key: ' + data.message);
+                }
+            });
+        }
+
+        function updateModel() {
+            const model = document.getElementById('model-select').value;
+            fetch('/update_model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ model: model })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    if (data.stats) {
+                        updateStats(data.stats);
+                    }
+                } else {
+                    alert('Error updating model: ' + data.message);
+                }
+            });
+        }
+
+        function updateMode(mode) {
+            fetch('/update_mode', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mode: mode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Update template based on mode
+                    const templateSelect = document.getElementById('template-select');
+                    
+                    // Hide all mode-specific options first
+                    Array.from(templateSelect.options).forEach(option => {
+                        if (option.classList.contains('mode-specific')) {
+                            option.style.display = 'none';
+                        }
+                    });
+                    
+                    // Show only relevant options
+                    Array.from(templateSelect.options).forEach(option => {
+                        const value = option.value;
+                        if (value === mode || value === 'default' || value === 'job_description') {
+                            option.style.display = '';
+                        }
+                    });
+                    
+                    // Set template to mode-specific one
+                    templateSelect.value = mode;
+                    updatePromptTemplate();
+                }
+            });
+        }
+
+        function updateColumn() {
+            const column = document.getElementById('column-select').value;
+            fetch('/update_column', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ column: column })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                }
+            });
+        }
+
+        function processData() {
+            const customPrompt = document.getElementById('custom-prompt').value;
+            fetch('/process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ custom_prompt: customPrompt })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Handle successful processing
+                    alert('Processing completed successfully!');
+                } else {
+                    alert('Error processing data: ' + data.message);
+                }
+            });
+        }
+
+        function updateStats(stats) {
+            const statsContainer = document.querySelector('.stats-grid');
+            if (!statsContainer) return;
+
+            let html = `
+                <div class="stat-box">
+                    <h4>Basic Stats</h4>
+                    <p>Total Rows: ${stats.row_count}</p>
+                    <p>Average Characters: ${stats.mean_chars}</p>
+                    <p>Median Characters: ${stats.median_chars}</p>
+                    <p>Total Characters: ${stats.total_chars}</p>
+                </div>
+            `;
+
+            for (const [model, cost] of Object.entries(stats.costs)) {
+                html += `
+                    <div class="stat-box model-cost">
+                        <h5>${cost.display_name}</h5>
+                        <div class="cost-grid">
+                            <div class="cost-section">
+                                <h6>Input Costs (per 1M tokens)</h6>
+                                <p>Regular: $${(cost.input_price * 1000).toFixed(2)}</p>
+                                <p>Cached: $${(cost.cached_input_price * 1000).toFixed(2)}</p>
+                            </div>
+                            <div class="cost-section">
+                                <h6>Output Cost (per 1M tokens)</h6>
+                                <p>$${(cost.output_price * 1000).toFixed(2)}</p>
+                            </div>
+                        </div>
+                        <div class="total-cost">
+                            <p>Total Cost (Regular): $${cost.estimated_total_cost}</p>
+                            <p>Total Cost (Cached): $${cost.estimated_total_cost_cached}</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            statsContainer.innerHTML = html;
+        }
+
+        function showTab(index) {
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.preview-content').forEach(content => content.classList.remove('active'));
+            
+            document.querySelectorAll('.tab-button')[index].classList.add('active');
+            document.getElementById(`tab-${index}`).classList.add('active');
+
+            // Update prompt preview with new CSV data
+            const csvData = document.getElementById(`tab-${index}`).textContent;
+            const previewElement = document.querySelector('.prompt-preview .preview-content');
+            if (previewElement.textContent !== 'No preview available') {
+                const template = document.getElementById('custom-prompt').value;
+                updatePromptPreviewWithData(template, csvData);
+            }
+        }
+
+        function updatePromptTemplate() {
+            const select = document.getElementById('template-select');
+            const templates = {{ sample_prompts|tojson }};
+            const selectedTemplate = templates[select.value];
+            
+            if (selectedTemplate) {
+                const template = selectedTemplate.template;
+                document.getElementById('custom-prompt').value = template;
+                
+                // Get current CSV data
+                const activeTab = document.querySelector('.preview-content.active');
+                const csvData = activeTab ? activeTab.textContent : '';
+                
+                // Update preview with new template
+                updatePromptPreviewWithData(template, csvData);
+
+                // Update cost statistics with new template
+                updateCostStats(template);
+            }
+        }
+
+        function updatePromptPreviewWithData(template, csvData) {
+            if (!csvData) return;
+            
+            const preview = template.replace('{csv column input}', csvData);
+            const previewElement = document.querySelector('.prompt-preview .preview-content');
+            previewElement.innerHTML = preview.replace(csvData, '<span class="csv-data">' + csvData + '</span>');
+        }
+
+        function updateCostStats(template) {
+            fetch('/update_cost_stats', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    template: template || document.getElementById('custom-prompt').value
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.stats) {
+                    updateStats(data.stats);
+                }
+            });
+        }
+
+        // Initialize the first preview tab as active and hide non-relevant templates
+        document.addEventListener('DOMContentLoaded', function() {
+            showTab(0);
+            
+            // Hide non-relevant templates based on current mode
+            const mode = '{{ session.get("mode", "summarize") }}';
+            const templateSelect = document.getElementById('template-select');
+            
+            // Hide all mode-specific options first
+            Array.from(templateSelect.options).forEach(option => {
+                if (option.classList.contains('mode-specific')) {
+                    option.style.display = 'none';
+                }
+            });
+            
+            // Show only relevant options
+            Array.from(templateSelect.options).forEach(option => {
+                const value = option.value;
+                if (value === mode || value === 'default' || value === 'job_description') {
+                    option.style.display = '';
+                }
+            });
+
+            // Update cost stats with initial template
+            updateCostStats();
+        });
+    </script>
+</body>
+</html> 
