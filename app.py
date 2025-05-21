@@ -2,10 +2,12 @@ import os
 import openai
 import pandas as pd
 import numpy as np
-from flask import Flask, request, render_template, redirect, url_for, session, send_file, jsonify
+from flask import Flask, request, render_template, redirect, url_for, session, send_file, jsonify, Response
 from werkzeug.utils import secure_filename
 import traceback
 from dotenv import load_dotenv
+from collections import OrderedDict
+import json
 
 # === Load Environment Variables ===
 load_dotenv()
@@ -52,34 +54,160 @@ MODEL_PRICING = {
 
 # === Sample Prompts ===
 SAMPLE_PROMPTS = {
-    'default': {
-        'name': 'Default Template',
-        'template': '{csv column input}'
-    },
-    'job_description': {
-        'name': 'Job Description Analysis',
-        'template': '''Analyze the following job description and categorize it into these key areas:
-1. Required Technical Skills
-2. Required Soft Skills
-3. Experience Level
-4. Company Benefits
-5. Primary Responsibilities
-
-Job Description:
-{csv column input}'''
-    },
-    'summarize': {
-        'name': 'Text Summarization',
-        'template': '''Please provide a concise summary of the following text, highlighting the key points and main ideas:
+    'summarization': OrderedDict([
+        ('default', {
+            'name': 'Default Summarization',
+            'template': '''Please provide a concise summary of the following text, highlighting the key points and main ideas:
 
 {csv column input}'''
-    },
-    'classify': {
-        'name': 'Text Classification',
-        'template': '''Please classify the following text into appropriate categories based on its content and themes:
+        }),
+        ('trip_report', {
+            'name': 'Trip Report Analysis',
+            'template': '''Act as my research assistant in psychedelic medicine. I will provide you with a first-person psychedelic trip report. Your task is to summarize it using the structure below:
 
+Trip Report:
+{csv column input}
+
+End of trip report. As my research assistant, here is the format of the summary I want you to write for me:
+
+Structure:
+1. A brief overview of the experience in bullet points
+2. Descriptions of the following details, each with:
+    - A description bullet point, about 3-5 sentences each.
+    - A quote bullet point pulled directly from the report for support
+
+The details are: 
+
+Experience Level
+- How experienced were they with psychedelics? Have they had previous trips?
+- Quote: "..."
+
+Control/Environmental Safety Level
+- How much control or environmental safety did the user have during the experience?
+- Quote: "..."
+
+Contextual Understanding
+- How much guiding mental, spiritual, or philosophical framework did the user have going into the trip?
+- Quote: "..."
+
+Intention
+- Did they have a specific reason or goal? Was preparation involved?
+- Quote: "..."
+
+Outcome
+- Was the experience positive, negative, or mixed?
+- Quote: "..."
+
+Integration Practice
+- Efforts to integrate afterward?
+- Quote: "..." or "No integration practices were mentioned."
+
+Important Notes:
+- Use bullet points for both the description and its corresponding quote.
+- Accuracy is HIGHLY IMPORTANT - include only what is explicitly stated.'''
+        }),
+        ('bullet_points', {
+            'name': 'Bullet Point Summary',
+            'template': '''Please summarize the following text into clear, concise bullet points:
+
+{csv column input}
+
+Please format your response as:
+• Key point 1
+• Key point 2
+• Key point 3'''
+        }),
+        ('executive', {
+            'name': 'Executive Summary',
+            'template': '''Please provide an executive summary of the following text, including:
+1. Main objective/purpose
+2. Key findings/points
+3. Conclusions/recommendations
+
+Text:
 {csv column input}'''
-    }
+        })
+    ]),
+    'classification': OrderedDict([
+        ('default', {
+            'name': 'Default Classification',
+            'template': '''Please classify the following text into these categories and assign a score from 1-5 for each (1=lowest, 5=highest). Return only labels and scores, one per line:
+
+Complexity: (technical/conceptual complexity)
+Clarity: (how clear and well-written)
+Relevance: (topic relevance)
+Actionability: (can be acted upon)
+Impact: (potential impact if acted upon)
+
+Text:
+{csv column input}'''
+        }),
+        ('trip_report', {
+            'name': 'Trip Report Classification',
+            'template': '''You are analyzing a summarized psychedelic trip report. It contains sections such as Experience Level, Control/Environmental Safety Level, Contextual Understanding, Intention, Integration Practice, and Outcome.
+
+Assign a score to each of the following categories:
+
+Experience: 1–5  
+Control: 1–5  
+Context: 1–5  
+Intention: 1–5  
+Integration: 1 if integration efforts were described, 0 otherwise  
+Outcome: 1–5  (1 = distressing/negative, 5 = positive/meaningful)
+
+Respond in the following exact format (labels plus number, one per line, no extra text):
+
+Experience: 4  
+Control: 3  
+Context: 4  
+Intention: 5  
+Integration: 0  
+Outcome: 4
+
+Trip Summary:
+{csv column input}'''
+        }),
+        ('sentiment', {
+            'name': 'Sentiment Analysis',
+            'template': '''Analyze the sentiment of the following text and provide scores from 1-5 for each aspect. Return only labels and scores, one per line:
+
+Positivity: (1=very negative, 5=very positive)
+Intensity: (1=mild, 5=strong)
+Objectivity: (1=very subjective, 5=very objective)
+Confidence: (1=low confidence, 5=high confidence)
+
+Text:
+{csv column input}'''
+        }),
+        ('topic', {
+            'name': 'Topic Classification',
+            'template': '''Classify the following text into these topic categories. For each category, assign a relevance score from 0-5 (0=not relevant, 5=highly relevant). Return only labels and scores, one per line:
+
+Technology: 
+Business: 
+Science: 
+Politics: 
+Entertainment: 
+Health: 
+Education: 
+Other: 
+
+Text:
+{csv column input}'''
+        }),
+        ('custom_categories', {
+            'name': 'Custom Categories',
+            'template': '''Classify the following text into these categories. For each category, assign a relevance score from 0-5 (0=not relevant, 5=highly relevant). Return only labels and scores, one per line:
+
+CategoryA: 
+CategoryB: 
+CategoryC: 
+Other: 
+
+Text:
+{csv column input}'''
+        })
+    ])
 }
 
 # === Flask Setup ===
@@ -123,24 +251,19 @@ def calculate_stats(df, column, selected_model=None, template=None):
     for model in models_to_calculate:
         if model in MODEL_PRICING:
             prices = MODEL_PRICING[model]
-            input_cost = total_input_tokens_millions * prices['input']
-            cached_input_cost = total_input_tokens_millions * prices['cached_input']
-            output_cost = total_output_tokens_millions * prices['output']
-            total_cost = input_cost + output_cost
-            total_cost_cached = cached_input_cost + output_cost
-            
+            # Use the raw price values directly from MODEL_PRICING
             stats['costs'][model] = {
                 'display_name': prices['display_name'],
-                'input_price': prices['input'],
+                'input_price': prices['input'],  # This will now be the correct $2.00 per 1M tokens
                 'cached_input_price': prices['cached_input'],
                 'output_price': prices['output'],
                 'estimated_input_tokens': int(total_input_tokens),
                 'estimated_output_tokens': int(total_output_tokens),
-                'estimated_input_cost': round(input_cost, 4),
-                'estimated_cached_input_cost': round(cached_input_cost, 4),
-                'estimated_output_cost': round(output_cost, 4),
-                'estimated_total_cost': round(total_cost, 4),
-                'estimated_total_cost_cached': round(total_cost_cached, 4)
+                'estimated_input_cost': round(total_input_tokens_millions * prices['input'], 4),
+                'estimated_cached_input_cost': round(total_input_tokens_millions * prices['cached_input'], 4),
+                'estimated_output_cost': round(total_output_tokens_millions * prices['output'], 4),
+                'estimated_total_cost': round(total_input_tokens_millions * prices['input'] + total_output_tokens_millions * prices['output'], 4),
+                'estimated_total_cost_cached': round(total_input_tokens_millions * prices['cached_input'] + total_output_tokens_millions * prices['output'], 4)
             }
     
     return stats
@@ -212,7 +335,7 @@ def index():
                         preview_data=get_preview_data(),
                         stats=stats,
                         sample_prompts=SAMPLE_PROMPTS,
-                        prompt_template=request.form.get('custom_prompt', SAMPLE_PROMPTS['default']['template']),
+                        prompt_template=request.form.get('custom_prompt', SAMPLE_PROMPTS['summarization']['default']['template']),
                         prompt_preview=get_prompt_preview())
 
 # === File Upload Handler ===
@@ -309,7 +432,7 @@ def update_model():
 def update_mode():
     data = request.get_json()
     mode = data.get('mode')
-    if mode in ['summarize', 'classify']:
+    if mode in ['summarize', 'classification']:
         session['mode'] = mode
     return jsonify({'status': 'success'})
 
@@ -352,8 +475,8 @@ def get_preview_data():
         if column not in df.columns:
             return None
             
-        # Get first 5 entries
-        preview_data = df[column].head(5).tolist()
+        # Get first 5 entries and convert to string
+        preview_data = df[column].head(5).apply(str).tolist()
         return preview_data
     except Exception as e:
         print(f"Error getting preview data: {str(e)}")
@@ -370,14 +493,14 @@ def get_prompt_preview():
         if column not in df.columns:
             return None
             
-        # Get first entry
-        sample_text = df[column].iloc[0]
+        # Get first entry and convert to string
+        sample_text = str(df[column].iloc[0])
         
         # Get current template
-        template = request.form.get('custom_prompt', SAMPLE_PROMPTS['default']['template'])
+        template = request.form.get('custom_prompt', SAMPLE_PROMPTS['summarization']['default']['template'])
         
         # Replace placeholder with sample text
-        preview = template.replace('{csv column input}', str(sample_text))
+        preview = template.replace('{csv column input}', sample_text)
         return preview
     except Exception as e:
         print(f"Error generating prompt preview: {str(e)}")
@@ -397,33 +520,64 @@ def process():
         
         openai.api_key = os.getenv('OPENAI_API_KEY')
         model = os.getenv('MODEL', 'gpt-4.1')
+        
+        # Create a client using the new OpenAI format
+        client = openai.OpenAI(api_key=openai.api_key)
 
         results = []
-        for i, row in enumerate(df[col]):
+        total_rows = len(df[col])
+        
+        def generate_response(prompt):
             try:
-                print(f"→ Processing row {i + 1}")
-                prompt = prompt_template.replace('{csv column input}', str(row))
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model=model,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.5,
                 )
-                result = response.choices[0].message.content.strip()
-                results.append(result)
+                return response.choices[0].message.content.strip()
             except Exception as e:
-                print(f"❌ LLM error on row {i+1}:", e)
-                traceback.print_exc()
-                results.append("LLM ERROR")
+                print(f"Error in LLM call: {str(e)}")
+                return f"LLM ERROR: {str(e)}"
 
-        # Add results to dataframe
-        result_column = 'Summary' if mode == 'summarize' else 'Classification'
-        df[result_column] = results
+        # Create SSE response
+        def generate():
+            for i, row in enumerate(df[col]):
+                try:
+                    print(f"→ Processing row {i + 1} of {total_rows}")
+                    prompt = prompt_template.replace('{csv column input}', str(row))
+                    
+                    # Get LLM response
+                    result = generate_response(prompt)
+                    results.append(result)
+                    
+                    # Send progress and result
+                    progress = {
+                        'current': i + 1,
+                        'total': total_rows,
+                        'result': result,
+                        'status': 'processing'
+                    }
+                    yield f"data: {json.dumps(progress)}\n\n"
+                    
+                except Exception as e:
+                    print(f"❌ Error on row {i+1}:", e)
+                    traceback.print_exc()
+                    results.append(f"ERROR: {str(e)}")
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-        # Save and send file
-        os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-        out_path = os.path.join(OUTPUT_FOLDER, f'{mode}_output.csv')
-        df.to_csv(out_path, index=False)
-        return send_file(out_path, as_attachment=True)
+            # Add results to dataframe
+            result_column = 'Summary' if mode == 'summarize' else 'Classification'
+            df[result_column] = results
+
+            # Save file
+            os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+            out_path = os.path.join(OUTPUT_FOLDER, f'{mode}_output.csv')
+            df.to_csv(out_path, index=False)
+            
+            # Send completion message
+            yield f"data: {json.dumps({'status': 'complete', 'file': out_path})}\n\n"
+
+        return Response(generate(), mimetype='text/event-stream')
 
     except Exception as e:
         traceback.print_exc()
