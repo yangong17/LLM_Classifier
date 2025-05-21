@@ -652,12 +652,25 @@
                     <span id="progress-count">0</span> / <span id="total-count">0</span> rows
                 </div>
             </div>
+            <div id="model-info" style="margin-bottom: 15px; color: #666;">
+                Using model: <span id="current-model">Loading...</span>
+            </div>
             <div style="width: 100%; height: 20px; background: #ddd; border-radius: 10px; overflow: hidden;">
                 <div id="progress-bar" style="width: 0%; height: 100%; background: #4CAF50; transition: width 0.3s ease;"></div>
             </div>
         </div>
         <div id="log-container" style="background: #2c3e50; color: #fff; padding: 20px; border-radius: 8px; font-family: monospace; height: 300px; overflow-y: auto;">
             <div id="log-content"></div>
+        </div>
+    </div>
+
+    <!-- Classification Prompt Dialog -->
+    <div id="classification-prompt" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000; max-width: 500px; width: 90%;">
+        <h3 style="margin-top: 0;">Proceed to Classification?</h3>
+        <p>Would you like to classify the summarized content?</p>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+            <button onclick="closeClassificationPrompt()" style="padding: 8px 16px; border: 1px solid #ddd; background: #f5f5f5; border-radius: 4px; cursor: pointer;">No, Skip</button>
+            <button onclick="proceedToClassification()" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Yes, Proceed</button>
         </div>
     </div>
     {% endif %}
@@ -770,6 +783,7 @@
             const progressBar = document.getElementById('progress-bar');
             const progressCount = document.getElementById('progress-count');
             const totalCount = document.getElementById('total-count');
+            const currentModel = document.getElementById('current-model');
             
             // Reset and show processing log
             logContent.innerHTML = '';
@@ -777,12 +791,15 @@
             processButton.disabled = true;
             processButton.textContent = 'Processing...';
             
-            // Create form data
-            const formData = new FormData();
-            formData.append('custom_prompt', customPrompt);
-
+            // Update model info
+            const modelSelect = document.getElementById('model-select');
+            const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+            currentModel.textContent = selectedOption.text;
+            
             // Create EventSource for Server-Sent Events
-            const eventSource = new EventSource('/process?' + new URLSearchParams(formData).toString());
+            const eventSource = new EventSource('/process?' + new URLSearchParams({
+                custom_prompt: customPrompt
+            }).toString());
 
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);
@@ -794,20 +811,18 @@
                     progressCount.textContent = data.current;
                     totalCount.textContent = data.total;
                     
-                    // Add log entry
+                    // Add log entry with truncated result
+                    const truncatedResult = data.result.length > 100 ? 
+                        data.result.substring(0, 100) + '...' : 
+                        data.result;
                     const logEntry = document.createElement('div');
-                    logEntry.innerHTML = `<span style="color: #4CAF50;">→</span> Row ${data.current}/${data.total}: ${data.result}`;
+                    logEntry.innerHTML = `<span style="color: #4CAF50;">→</span> Row ${data.current}/${data.total}: ${truncatedResult}`;
                     logContent.appendChild(logEntry);
                     logContent.scrollTop = logContent.scrollHeight;
                 }
                 else if (data.status === 'complete') {
                     // Download completed file
-                    const a = document.createElement('a');
-                    a.href = data.file;
-                    a.download = 'processed_output.csv';
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
+                    window.location.href = data.file;
                     
                     // Reset UI
                     processButton.disabled = false;
@@ -817,6 +832,11 @@
                     const logEntry = document.createElement('div');
                     logEntry.innerHTML = '<span style="color: #4CAF50;">✓</span> Processing complete! Downloading results...';
                     logContent.appendChild(logEntry);
+                    
+                    // If this was a summarization, offer classification
+                    if (data.mode === 'summarize' && data.offer_classification) {
+                        setTimeout(showClassificationPrompt, 1000);
+                    }
                     
                     // Close connection
                     eventSource.close();
@@ -998,6 +1018,36 @@
             // Update cost stats with initial template
             updateCostStats();
         });
+
+        function showClassificationPrompt() {
+            document.getElementById('classification-prompt').style.display = 'block';
+        }
+
+        function closeClassificationPrompt() {
+            document.getElementById('classification-prompt').style.display = 'none';
+        }
+
+        function proceedToClassification() {
+            // Close the prompt
+            document.getElementById('classification-prompt').style.display = 'none';
+            
+            // Switch to classification mode
+            updateMode('classify');
+            
+            // Update column select if it exists
+            const columnSelect = document.getElementById('column-select');
+            if (columnSelect) {
+                // Find the Summary option
+                const summaryOption = Array.from(columnSelect.options).find(opt => opt.value === 'Summary');
+                if (summaryOption) {
+                    summaryOption.selected = true;
+                    columnSelect.dispatchEvent(new Event('change'));
+                }
+            }
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
     </script>
 </body>
 </html> 

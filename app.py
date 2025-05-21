@@ -506,8 +506,26 @@ def get_prompt_preview():
         print(f"Error generating prompt preview: {str(e)}")
         return None
 
+def parse_classification_result(result):
+    """Parse classification result into a dictionary of category:score pairs"""
+    try:
+        categories = {}
+        for line in result.strip().split('\n'):
+            if ':' in line:
+                category, score = line.split(':', 1)
+                category = category.strip().lower()
+                # Try to convert score to integer
+                try:
+                    score = int(score.strip())
+                    categories[category] = score
+                except ValueError:
+                    return None  # Invalid score format
+        return categories if categories else None
+    except Exception:
+        return None
+
 # === Process Route ===
-@app.route('/process', methods=['POST'])
+@app.route('/process', methods=['GET', 'POST'])
 def process():
     if not is_api_key_valid():
         return "Please set your OpenAI API key first", 400
@@ -516,7 +534,15 @@ def process():
         df = pd.read_csv(session['csv_path'])
         col = session['selected_column']
         mode = session.get('mode', 'summarize')
-        prompt_template = request.form['custom_prompt']
+        
+        # Handle both GET and POST methods
+        if request.method == 'POST':
+            prompt_template = request.form['custom_prompt']
+        else:
+            prompt_template = request.args.get('custom_prompt')
+        
+        if not prompt_template:
+            return "No prompt template provided", 400
         
         openai.api_key = os.getenv('OPENAI_API_KEY')
         model = os.getenv('MODEL', 'gpt-4.1')
@@ -525,7 +551,9 @@ def process():
         client = openai.OpenAI(api_key=openai.api_key)
 
         results = []
+        parsed_results = []  # For classification mode
         total_rows = len(df[col])
+        output_filename = f'{mode}_output.csv'
         
         def generate_response(prompt):
             try:
@@ -541,6 +569,8 @@ def process():
 
         # Create SSE response
         def generate():
+            out_path = None  # Store the output path for later use
+            
             for i, row in enumerate(df[col]):
                 try:
                     print(f"→ Processing row {i + 1} of {total_rows}")
@@ -549,6 +579,16 @@ def process():
                     # Get LLM response
                     result = generate_response(prompt)
                     results.append(result)
+                    
+                    # For classification mode, validate and parse the result
+                    if mode == 'classification':
+                        parsed = parse_classification_result(result)
+                        if parsed is None:
+                            error_msg = "Invalid classification format. Expected format: Category: Score"
+                            yield f"data: {json.dumps({'error': error_msg})}\n\n"
+                            parsed_results.append({})  # Add empty dict to maintain row alignment
+                        else:
+                            parsed_results.append(parsed)
                     
                     # Send progress and result
                     progress = {
@@ -562,26 +602,100 @@ def process():
                 except Exception as e:
                     print(f"❌ Error on row {i+1}:", e)
                     traceback.print_exc()
-                    results.append(f"ERROR: {str(e)}")
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    error_msg = str(e)
+                    results.append(f"ERROR: {error_msg}")
+                    if mode == 'classification':
+                        parsed_results.append({})
+                    yield f"data: {json.dumps({'error': error_msg})}\n\n"
 
             # Add results to dataframe
-            result_column = 'Summary' if mode == 'summarize' else 'Classification'
-            df[result_column] = results
+            if mode == 'classification':
+                # Get all unique categories
+                categories = set()
+                for result in parsed_results:
+                    categories.update(result.keys())
+                
+                # Create columns for each category
+                for category in categories:
+                    column_name = category.title()  # Capitalize first letter
+                    df[column_name] = [result.get(category, None) for result in parsed_results]
+                
+                # Add raw output column
+                df['Raw_Output'] = results
+            else:
+                df['Summary'] = results
 
             # Save file
             os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-            out_path = os.path.join(OUTPUT_FOLDER, f'{mode}_output.csv')
+            out_path = os.path.join(OUTPUT_FOLDER, output_filename)
             df.to_csv(out_path, index=False)
             
-            # Send completion message
-            yield f"data: {json.dumps({'status': 'complete', 'file': out_path})}\n\n"
+            # Send completion message with download path and additional info
+            completion_data = {
+                'status': 'complete',
+                'file': f'/download/{output_filename}',
+                'mode': mode,
+                'output_path': out_path  # Include the output path in response
+            }
+            
+            # If this was a summarization, add prompt for classification
+            if mode == 'summarize':
+                completion_data['offer_classification'] = True
+                
+            yield f"data: {json.dumps(completion_data)}\n\n"
 
         return Response(generate(), mimetype='text/event-stream')
 
     except Exception as e:
         traceback.print_exc()
-        return f"Error during processing: {str(e)}"
+        return f"Error during processing: {str(e)}", 400
+
+@app.route('/store_summary_path', methods=['POST'])
+def store_summary_path():
+    """Store the summary file path in session"""
+    try:
+        data = request.get_json()
+        output_path = data.get('output_path')
+        if output_path and os.path.exists(output_path):
+            session['last_summary_file'] = output_path
+            return jsonify({'status': 'success'})
+        return jsonify({'status': 'error', 'message': 'Invalid output path'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/load_summary_for_classification', methods=['POST'])
+def load_summary_for_classification():
+    """Load the last summary file for classification"""
+    try:
+        if 'last_summary_file' not in session:
+            return jsonify({'status': 'error', 'message': 'No summary file available'})
+            
+        # Load the summary file
+        df = pd.read_csv(session['last_summary_file'])
+        
+        # Save as the current working file
+        new_path = os.path.join(UPLOAD_FOLDER, 'current_working.csv')
+        df.to_csv(new_path, index=False)
+        session['csv_path'] = new_path
+        session['columns'] = df.columns.tolist()
+        session['selected_column'] = 'Summary'  # Select the summary column by default
+        session['mode'] = 'classification'  # Switch to classification mode
+        
+        return jsonify({
+            'status': 'success',
+            'columns': df.columns.tolist(),
+            'selected_column': 'Summary'
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+# Add a download route for the output file
+@app.route('/download/<filename>')
+def download_file(filename):
+    try:
+        return send_file(os.path.join(OUTPUT_FOLDER, filename), as_attachment=True)
+    except Exception as e:
+        return f"Error downloading file: {str(e)}", 404
 
 @app.route('/get_prompt_preview', methods=['POST'])
 def get_prompt_preview_route():
