@@ -157,6 +157,7 @@ Outcome: 1–5  (1 = distressing/negative, 5 = positive/meaningful)
 
 Respond in the following exact format (labels plus number, one per line, no extra text):
 
+Example:
 Experience: 4  
 Control: 3  
 Context: 4  
