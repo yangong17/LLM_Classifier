@@ -8,6 +8,9 @@ import traceback
 from dotenv import load_dotenv
 from collections import OrderedDict
 import json
+from functools import wraps
+import secrets
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # === Load Environment Variables ===
 load_dotenv()
@@ -31,12 +34,6 @@ MODEL_PRICING = {
         'input': 0.10,
         'cached_input': 0.025,
         'output': 0.40
-    },
-    'gpt-4.5-preview': {
-        'display_name': 'GPT-4.5 Preview ($75.00/$150.00 per 1M tokens)',
-        'input': 75.00,
-        'cached_input': 37.50,
-        'output': 150.00
     },
     'gpt-4o': {
         'display_name': 'GPT-4O ($2.50/$10.00 per 1M tokens)',
@@ -219,6 +216,28 @@ OUTPUT_FOLDER = 'outputs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+# === Constants ===
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'Stats418')  # Read from .env, fallback to Stats418
+
+# === Authentication Functions ===
+def init_auth_env():
+    """Initialize authentication environment variables"""
+    if not os.path.exists('.env'):
+        admin_password = secrets.token_urlsafe(16)  # Generate a secure random password
+        with open('.env', 'w') as f:
+            f.write(f'OPENAI_API_KEY=\nMODEL=gpt-4.1\nADMIN_PASSWORD_HASH={generate_password_hash(admin_password)}\n')
+        print(f"Initial admin password: {admin_password}")
+        return True
+    return False
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('authenticated'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 def calculate_stats(df, column, selected_model=None, template=None):
     if column not in df.columns:
         return None
@@ -271,23 +290,56 @@ def calculate_stats(df, column, selected_model=None, template=None):
 
 # === Initialize from Environment ===
 def init_env():
-    if not os.path.exists('.env'):
-        with open('.env', 'w') as f:
-            f.write('OPENAI_API_KEY=\nMODEL=gpt-4.1')
-
-init_env()
+    try:
+        is_new = init_auth_env()  # Initialize authentication first
+        if not is_new and not os.path.exists('.env'):
+            with open('.env', 'w') as f:
+                f.write('OPENAI_API_KEY=\nMODEL=gpt-4.1\n')
+        load_dotenv()  # Reload environment variables
+        return True
+    except Exception as e:
+        print(f"Error initializing environment: {str(e)}")
+        return False
 
 def is_api_key_valid():
     api_key = os.getenv('OPENAI_API_KEY')
-    return api_key and api_key.strip() and api_key != 'your_api_key_here'
+    if not api_key or not api_key.strip() or api_key == 'your_api_key_here':
+        return False
+    try:
+        # Test the API key using the models endpoint
+        openai.api_key = api_key
+        openai.Model.list()
+        return True
+    except Exception:
+        return False
 
 def mask_api_key(api_key):
     if not api_key or len(api_key) < 6:
         return "••••••"
     return f"{api_key[:2]}••••{api_key[-4:]}"
 
+# Initialize environment before starting app
+if not init_env():
+    print("Warning: Failed to initialize environment file. API key functionality may not work.")
+
+# === Authentication Routes ===
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        if request.form.get('password') == ADMIN_PASSWORD:
+            session['authenticated'] = True
+            return redirect(url_for('index'))
+        return render_template('login.html', error="Invalid password")
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 # === Main Route ===
 @app.route('/', methods=['GET', 'POST'])
+@login_required
 def index():
     # Step 1: File Upload
     if 'csv_path' not in session:
@@ -371,30 +423,59 @@ def update_column():
     return jsonify({'status': 'success'})
 
 @app.route('/update_api_key', methods=['POST'])
+@login_required
 def update_api_key():
     data = request.get_json()
-    api_key = data.get('api_key')
-    if api_key:
+    api_key = data.get('api_key', '').strip()
+    
+    if not api_key:
+        return jsonify({'status': 'error', 'message': 'No API key provided'}), 400
+        
+    try:
+        # Test the API key using the models endpoint (free)
+        openai.api_key = api_key
+        openai.Model.list()
+        
         try:
-            # Test the API key using the models endpoint (free)
-            openai.api_key = api_key
-            openai.Model.list()
-            
             # If the API call was successful, save the key
-            with open('.env', 'r') as f:
-                env_lines = f.readlines()
+            if not os.path.exists('.env'):
+                with open('.env', 'w') as f:
+                    f.write(f'OPENAI_API_KEY={api_key}\nMODEL=gpt-4.1')
+            else:
+                with open('.env', 'r') as f:
+                    env_lines = f.readlines()
+                
+                with open('.env', 'w') as f:
+                    key_written = False
+                    for line in env_lines:
+                        if line.startswith('OPENAI_API_KEY='):
+                            f.write(f'OPENAI_API_KEY={api_key}\n')
+                            key_written = True
+                        else:
+                            f.write(line)
+                    if not key_written:
+                        f.write(f'\nOPENAI_API_KEY={api_key}')
             
-            with open('.env', 'w') as f:
-                for line in env_lines:
-                    if line.startswith('OPENAI_API_KEY='):
-                        f.write(f'OPENAI_API_KEY={api_key}\n')
-                    else:
-                        f.write(line)
+            # Reload environment
             load_dotenv()
+            
+            # Verify the key was saved and loaded correctly
+            if not is_api_key_valid():
+                raise Exception("API key was not saved correctly")
+                
             return jsonify({'status': 'success'})
+            
         except Exception as e:
-            return jsonify({'status': 'error', 'message': str(e)}), 400
-    return jsonify({'status': 'error', 'message': 'No API key provided'}), 400
+            return jsonify({
+                'status': 'error',
+                'message': f'API key is valid but could not be saved: {str(e)}'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Invalid API key: {str(e)}'
+        }), 400
 
 @app.route('/update_model', methods=['POST'])
 def update_model():
@@ -527,6 +608,7 @@ def parse_classification_result(result):
 
 # === Process Route ===
 @app.route('/process', methods=['GET', 'POST'])
+@login_required
 def process():
     if not is_api_key_valid():
         return "Please set your OpenAI API key first", 400
@@ -692,6 +774,7 @@ def load_summary_for_classification():
 
 # Add a download route for the output file
 @app.route('/download/<filename>')
+@login_required
 def download_file(filename):
     try:
         return send_file(os.path.join(OUTPUT_FOLDER, filename), as_attachment=True)

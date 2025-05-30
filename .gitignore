@@ -1,3 +1,8 @@
 .env
-ignore
+__pycache__/
+*.pyc
+uploads/
+outputs/
+.DS_Store
+*.log
 
