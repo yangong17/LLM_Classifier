@@ -8,9 +8,6 @@ import traceback
 from dotenv import load_dotenv
 from collections import OrderedDict
 import json
-from functools import wraps
-import secrets
-from werkzeug.security import generate_password_hash, check_password_hash
 
 # === Load Environment Variables ===
 load_dotenv()
@@ -192,51 +189,38 @@ Other:
 
 Text:
 {csv column input}'''
-        }),
-        ('custom_categories', {
-            'name': 'Custom Categories',
-            'template': '''Classify the following text into these categories. For each category, assign a relevance score from 0-5 (0=not relevant, 5=highly relevant). Return only labels and scores, one per line:
-
-CategoryA: 
-CategoryB: 
-CategoryC: 
-Other: 
-
-Text:
-{csv column input}'''
         })
     ])
 }
 
 # === Flask Setup ===
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.urandom(24)  # Needed for session management, not authentication
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'outputs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# === Constants ===
-ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'Stats418')  # Read from .env, fallback to Stats418
-
-# === Authentication Functions ===
-def init_auth_env():
-    """Initialize authentication environment variables"""
-    if not os.path.exists('.env'):
-        admin_password = secrets.token_urlsafe(16)  # Generate a secure random password
-        with open('.env', 'w') as f:
-            f.write(f'OPENAI_API_KEY=\nMODEL=gpt-4.1\nADMIN_PASSWORD_HASH={generate_password_hash(admin_password)}\n')
-        print(f"Initial admin password: {admin_password}")
+def is_api_key_valid():
+    api_key = os.getenv('OPENAI_API_KEY')
+    if not api_key or not api_key.strip():
+        return False
+    try:
+        openai.api_key = api_key
+        client = openai.OpenAI(api_key=api_key)
+        client.models.list()  # Test the connection
         return True
-    return False
+    except openai.APIConnectionError as e:
+        print(f"Connection Error: {str(e)}")
+        return "connection_error"
+    except Exception as e:
+        print(f"API Error: {str(e)}")
+        return False
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('authenticated'):
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
+def mask_api_key(api_key):
+    if not api_key or len(api_key) < 6:
+        return "••••••"
+    return f"{api_key[:2]}••••{api_key[-4:]}"
 
 def calculate_stats(df, column, selected_model=None, template=None):
     if column not in df.columns:
@@ -254,7 +238,7 @@ def calculate_stats(df, column, selected_model=None, template=None):
     }
     
     # Estimate tokens (rough estimate: 4 chars per token)
-    prompt_template_chars = len(template) if template else 200  # Use actual template length if provided
+    prompt_template_chars = len(template) if template else 200
     input_tokens_per_row = (char_counts + prompt_template_chars) / 4
     output_tokens_per_row = (char_counts * 1.5) / 4  # Assuming output is ~1.5x input length
     
@@ -271,10 +255,9 @@ def calculate_stats(df, column, selected_model=None, template=None):
     for model in models_to_calculate:
         if model in MODEL_PRICING:
             prices = MODEL_PRICING[model]
-            # Use the raw price values directly from MODEL_PRICING
             stats['costs'][model] = {
                 'display_name': prices['display_name'],
-                'input_price': prices['input'],  # This will now be the correct $2.00 per 1M tokens
+                'input_price': prices['input'],
                 'cached_input_price': prices['cached_input'],
                 'output_price': prices['output'],
                 'estimated_input_tokens': int(total_input_tokens),
@@ -288,58 +271,83 @@ def calculate_stats(df, column, selected_model=None, template=None):
     
     return stats
 
-# === Initialize from Environment ===
-def init_env():
+def get_preview_data():
+    if 'csv_path' not in session or 'selected_column' not in session:
+        return None
+    
     try:
-        is_new = init_auth_env()  # Initialize authentication first
-        if not is_new and not os.path.exists('.env'):
-            with open('.env', 'w') as f:
-                f.write('OPENAI_API_KEY=\nMODEL=gpt-4.1\n')
-        load_dotenv()  # Reload environment variables
-        return True
+        df = pd.read_csv(session['csv_path'])
+        column = session['selected_column']
+        
+        if column not in df.columns:
+            return None
+            
+        # Get first 5 entries and convert to string
+        preview_data = df[column].head(5).apply(str).tolist()
+        return preview_data
     except Exception as e:
-        print(f"Error initializing environment: {str(e)}")
-        return False
+        print(f"Error getting preview data: {str(e)}")
+        return None
 
-def is_api_key_valid():
-    api_key = os.getenv('OPENAI_API_KEY')
-    if not api_key or not api_key.strip() or api_key == 'your_api_key_here':
-        return False
+def get_prompt_preview():
+    if 'csv_path' not in session or 'selected_column' not in session:
+        return None
+        
     try:
-        # Test the API key using the models endpoint
-        openai.api_key = api_key
-        openai.Model.list()
-        return True
-    except Exception:
-        return False
+        df = pd.read_csv(session['csv_path'])
+        column = session['selected_column']
+        
+        if column not in df.columns:
+            return None
+            
+        # Get first entry and convert to string
+        sample_text = str(df[column].iloc[0])
+        
+        # Get current template
+        template = request.form.get('custom_prompt', SAMPLE_PROMPTS['summarization']['default']['template'])
+        
+        # Replace placeholder with sample text
+        preview = template.replace('{csv column input}', sample_text)
+        return preview
+    except Exception as e:
+        print(f"Error generating prompt preview: {str(e)}")
+        return None
 
-def mask_api_key(api_key):
-    if not api_key or len(api_key) < 6:
-        return "••••••"
-    return f"{api_key[:2]}••••{api_key[-4:]}"
+def parse_classification_result(result):
+    """Parse classification result into a dictionary of category:score pairs"""
+    try:
+        categories = {}
+        lines = result.strip().split('\n')
+        
+        # Skip lines until we find actual category:score pairs
+        start_idx = 0
+        for i, line in enumerate(lines):
+            if ':' in line and any(c.isdigit() for c in line):
+                start_idx = i
+                break
+        
+        # Process only the relevant lines
+        for line in lines[start_idx:]:
+            if ':' in line:
+                category, score = line.split(':', 1)
+                category = category.strip().lower()
+                # Remove any parenthetical descriptions
+                category = category.split('(')[0].strip()
+                try:
+                    # Extract just the number from the score
+                    score_str = ''.join(c for c in score if c.isdigit())
+                    score = int(score_str)
+                    if 0 <= score <= 5:  # Validate score range
+                        categories[category] = score
+                except ValueError:
+                    continue  # Skip invalid scores instead of failing
+        return categories if categories else None
+    except Exception as e:
+        print(f"Error parsing classification result: {str(e)}")
+        return None
 
-# Initialize environment before starting app
-if not init_env():
-    print("Warning: Failed to initialize environment file. API key functionality may not work.")
-
-# === Authentication Routes ===
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        if request.form.get('password') == ADMIN_PASSWORD:
-            session['authenticated'] = True
-            return redirect(url_for('index'))
-        return render_template('login.html', error="Invalid password")
-    return render_template('login.html')
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
-
-# === Main Route ===
+# === Routes ===
 @app.route('/', methods=['GET', 'POST'])
-@login_required
 def index():
     # Step 1: File Upload
     if 'csv_path' not in session:
@@ -364,21 +372,34 @@ def index():
             return f"Error loading CSV: {str(e)}"
     
     # Step 3: API Key (if needed) and Main Dashboard
-    api_key_valid = is_api_key_valid()
+    api_key_status = is_api_key_valid()
+    
+    if api_key_status == "connection_error":
+        return render_template('dashboard.html',
+                            step='dashboard',
+                            needs_api_key=True,
+                            connection_error=True,
+                            error_message="❌ Connection error. Please check your internet connection and try again.",
+                            csv_uploaded=True,
+                            api_key=mask_api_key(os.getenv('OPENAI_API_KEY')),
+                            model=os.getenv('MODEL', 'gpt-4.1'),
+                            models=MODEL_PRICING,
+                            columns=session.get('columns', []),
+                            selected_column=session.get('selected_column'))
     
     # Calculate stats if we have both file and column
     stats = None
     if 'csv_path' in session and 'selected_column' in session:
         try:
             df = pd.read_csv(session['csv_path'])
-            selected_model = session.get('model', 'gpt-4.1')  # Default to gpt-4.1
+            selected_model = session.get('model', 'gpt-4.1')
             stats = calculate_stats(df, session['selected_column'], selected_model)
         except Exception as e:
             print(f"Error calculating stats: {str(e)}")
     
     return render_template('dashboard.html',
                         step='dashboard',
-                        needs_api_key=not api_key_valid,
+                        needs_api_key=not api_key_status,
                         csv_uploaded=True,
                         api_key=mask_api_key(os.getenv('OPENAI_API_KEY')),
                         model=os.getenv('MODEL', 'gpt-4.1'),
@@ -391,7 +412,6 @@ def index():
                         prompt_template=request.form.get('custom_prompt', SAMPLE_PROMPTS['summarization']['default']['template']),
                         prompt_preview=get_prompt_preview())
 
-# === File Upload Handler ===
 @app.route('/upload_file', methods=['POST'])
 def upload_file():
     if 'csv_file' not in request.files:
@@ -413,7 +433,6 @@ def upload_file():
         
     return redirect(url_for('index'))
 
-# === Settings Update Routes ===
 @app.route('/update_column', methods=['POST'])
 def update_column():
     data = request.get_json()
@@ -423,7 +442,6 @@ def update_column():
     return jsonify({'status': 'success'})
 
 @app.route('/update_api_key', methods=['POST'])
-@login_required
 def update_api_key():
     data = request.get_json()
     api_key = data.get('api_key', '').strip()
@@ -432,12 +450,13 @@ def update_api_key():
         return jsonify({'status': 'error', 'message': 'No API key provided'}), 400
         
     try:
-        # Test the API key using the models endpoint (free)
+        # Test the API key
         openai.api_key = api_key
-        openai.Model.list()
+        client = openai.OpenAI(api_key=api_key)
+        client.models.list()
         
         try:
-            # If the API call was successful, save the key
+            # Save the key
             if not os.path.exists('.env'):
                 with open('.env', 'w') as f:
                     f.write(f'OPENAI_API_KEY={api_key}\nMODEL=gpt-4.1')
@@ -514,8 +533,13 @@ def update_model():
 def update_mode():
     data = request.get_json()
     mode = data.get('mode')
-    if mode in ['summarize', 'classification']:
+    if mode in ['summarize', 'classify']:
         session['mode'] = mode
+        # Update template based on mode
+        if mode == 'classify':
+            session['template'] = SAMPLE_PROMPTS['classification']['default']['template']
+        else:
+            session['template'] = SAMPLE_PROMPTS['summarization']['default']['template']
     return jsonify({'status': 'success'})
 
 @app.route('/update_cost_stats', methods=['POST'])
@@ -545,70 +569,7 @@ def update_cost_stats():
             'message': str(e)
         })
 
-# === Helper Functions ===
-def get_preview_data():
-    if 'csv_path' not in session or 'selected_column' not in session:
-        return None
-    
-    try:
-        df = pd.read_csv(session['csv_path'])
-        column = session['selected_column']
-        
-        if column not in df.columns:
-            return None
-            
-        # Get first 5 entries and convert to string
-        preview_data = df[column].head(5).apply(str).tolist()
-        return preview_data
-    except Exception as e:
-        print(f"Error getting preview data: {str(e)}")
-        return None
-
-def get_prompt_preview():
-    if 'csv_path' not in session or 'selected_column' not in session:
-        return None
-        
-    try:
-        df = pd.read_csv(session['csv_path'])
-        column = session['selected_column']
-        
-        if column not in df.columns:
-            return None
-            
-        # Get first entry and convert to string
-        sample_text = str(df[column].iloc[0])
-        
-        # Get current template
-        template = request.form.get('custom_prompt', SAMPLE_PROMPTS['summarization']['default']['template'])
-        
-        # Replace placeholder with sample text
-        preview = template.replace('{csv column input}', sample_text)
-        return preview
-    except Exception as e:
-        print(f"Error generating prompt preview: {str(e)}")
-        return None
-
-def parse_classification_result(result):
-    """Parse classification result into a dictionary of category:score pairs"""
-    try:
-        categories = {}
-        for line in result.strip().split('\n'):
-            if ':' in line:
-                category, score = line.split(':', 1)
-                category = category.strip().lower()
-                # Try to convert score to integer
-                try:
-                    score = int(score.strip())
-                    categories[category] = score
-                except ValueError:
-                    return None  # Invalid score format
-        return categories if categories else None
-    except Exception:
-        return None
-
-# === Process Route ===
 @app.route('/process', methods=['GET', 'POST'])
-@login_required
 def process():
     if not is_api_key_valid():
         return "Please set your OpenAI API key first", 400
@@ -616,7 +577,7 @@ def process():
     try:
         df = pd.read_csv(session['csv_path'])
         col = session['selected_column']
-        mode = session.get('mode', 'summarize')
+        mode = request.args.get('mode', 'summarize')  # Get mode from request parameters
         
         # Handle both GET and POST methods
         if request.method == 'POST':
@@ -652,8 +613,6 @@ def process():
 
         # Create SSE response
         def generate():
-            out_path = None  # Store the output path for later use
-            
             for i, row in enumerate(df[col]):
                 try:
                     print(f"→ Processing row {i + 1} of {total_rows}")
@@ -664,7 +623,7 @@ def process():
                     results.append(result)
                     
                     # For classification mode, validate and parse the result
-                    if mode == 'classification':
+                    if mode == 'classify':
                         parsed = parse_classification_result(result)
                         if parsed is None:
                             error_msg = "Invalid classification format. Expected format: Category: Score"
@@ -687,12 +646,12 @@ def process():
                     traceback.print_exc()
                     error_msg = str(e)
                     results.append(f"ERROR: {error_msg}")
-                    if mode == 'classification':
+                    if mode == 'classify':
                         parsed_results.append({})
                     yield f"data: {json.dumps({'error': error_msg})}\n\n"
 
             # Add results to dataframe
-            if mode == 'classification':
+            if mode == 'classify':
                 # Get all unique categories
                 categories = set()
                 for result in parsed_results:
@@ -718,13 +677,10 @@ def process():
                 'status': 'complete',
                 'file': f'/download/{output_filename}',
                 'mode': mode,
-                'output_path': out_path  # Include the output path in response
+                'output_path': out_path,  # Include the output path in response
+                'offer_classification': mode == 'summarize'  # Only offer classification after summarization
             }
             
-            # If this was a summarization, add prompt for classification
-            if mode == 'summarize':
-                completion_data['offer_classification'] = True
-                
             yield f"data: {json.dumps(completion_data)}\n\n"
 
         return Response(generate(), mimetype='text/event-stream')
@@ -733,90 +689,17 @@ def process():
         traceback.print_exc()
         return f"Error during processing: {str(e)}", 400
 
-@app.route('/store_summary_path', methods=['POST'])
-def store_summary_path():
-    """Store the summary file path in session"""
-    try:
-        data = request.get_json()
-        output_path = data.get('output_path')
-        if output_path and os.path.exists(output_path):
-            session['last_summary_file'] = output_path
-            return jsonify({'status': 'success'})
-        return jsonify({'status': 'error', 'message': 'Invalid output path'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
-
-@app.route('/load_summary_for_classification', methods=['POST'])
-def load_summary_for_classification():
-    """Load the last summary file for classification"""
-    try:
-        if 'last_summary_file' not in session:
-            return jsonify({'status': 'error', 'message': 'No summary file available'})
-            
-        # Load the summary file
-        df = pd.read_csv(session['last_summary_file'])
-        
-        # Save as the current working file
-        new_path = os.path.join(UPLOAD_FOLDER, 'current_working.csv')
-        df.to_csv(new_path, index=False)
-        session['csv_path'] = new_path
-        session['columns'] = df.columns.tolist()
-        session['selected_column'] = 'Summary'  # Select the summary column by default
-        session['mode'] = 'classification'  # Switch to classification mode
-        
-        return jsonify({
-            'status': 'success',
-            'columns': df.columns.tolist(),
-            'selected_column': 'Summary'
-        })
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
-
-# Add a download route for the output file
 @app.route('/download/<filename>')
-@login_required
 def download_file(filename):
     try:
-        return send_file(os.path.join(OUTPUT_FOLDER, filename), as_attachment=True)
+        return send_file(
+            os.path.join(OUTPUT_FOLDER, filename),
+            as_attachment=True,
+            download_name=filename,
+            mimetype='text/csv'
+        )
     except Exception as e:
         return f"Error downloading file: {str(e)}", 404
-
-@app.route('/get_prompt_preview', methods=['POST'])
-def get_prompt_preview_route():
-    data = request.get_json()
-    template = data.get('template')
-    
-    if not template:
-        return jsonify({
-            'status': 'error',
-            'message': 'No template provided'
-        })
-    
-    try:
-        df = pd.read_csv(session['csv_path'])
-        column = session['selected_column']
-        
-        if column not in df.columns:
-            return jsonify({
-                'status': 'error',
-                'message': 'Invalid column'
-            })
-            
-        # Get first entry
-        sample_text = df[column].iloc[0]
-        
-        # Replace placeholder with sample text
-        preview = template.replace('{csv column input}', str(sample_text))
-        
-        return jsonify({
-            'status': 'success',
-            'preview': preview
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        })
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -456,6 +456,48 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             position: relative;
         }
+
+        .log-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .log-container h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        #log-content {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+
+        #log-content div {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        #log-content a {
+            color: #2196F3;
+            text-decoration: none;
+        }
+
+        #log-content a:hover {
+            text-decoration: underline;
+        }
+
+        #log-content span {
+            margin-right: 8px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -504,6 +546,9 @@
             <div class="input-group">
                 <input type="text" id="api-key" value="{{ api_key }}" placeholder="Enter OpenAI API Key">
                 <button onclick="updateApiKey()" class="button">Update API Key</button>
+                {% if connection_error %}
+                <div class="error-message">{{ error_message }}</div>
+                {% endif %}
             </div>
         </div>
         <div>
@@ -540,7 +585,7 @@
     <div class="mode-buttons">
         <button class="mode-button {% if session.get('mode', 'summarize') == 'summarize' %}active{% endif %}" 
                 onclick="updateMode('summarize')">Summarization Mode</button>
-        <button class="mode-button {% if session.get('mode') == 'classification' %}active{% endif %}" 
+        <button class="mode-button {% if session.get('mode') == 'classify' %}active{% endif %}" 
                 onclick="updateMode('classify')">Classification Mode</button>
     </div>
 
@@ -608,15 +653,15 @@
                 <div class="horizontal-arrow"></div>
                 <div class="template-controls">
                     <select id="template-select" onchange="updatePromptTemplate()">
-                        {% if session.get('mode', 'summarize') == 'summarize' %}
-                            {% for key, template in sample_prompts.summarization.items() %}
-                            <option value="summarization.{{ key }}">
+                        {% if session.get('mode') == 'classify' %}
+                            {% for key, template in sample_prompts.classification.items() %}
+                            <option value="classification.{{ key }}">
                                 {{ template.name }}
                             </option>
                             {% endfor %}
                         {% else %}
-                            {% for key, template in sample_prompts.classification.items() %}
-                            <option value="classification.{{ key }}">
+                            {% for key, template in sample_prompts.summarization.items() %}
+                            <option value="summarization.{{ key }}">
                                 {{ template.name }}
                             </option>
                             {% endfor %}
@@ -641,28 +686,14 @@
 
     <!-- Process Button -->
     <div class="process-button-container">
-        <button onclick="processData()" class="process-button" id="process-button">Process Data</button>
+        <button id="process-button" class="process-button" onclick="processData('summarize')">Summarize Data</button>
+        <button id="classify-button" class="process-button" onclick="processData('classify')" style="margin-left: 20px; background-color: #2196F3;">Classify Data</button>
     </div>
 
     <!-- Processing Log -->
-    <div id="processing-log" style="display: none; margin: 20px auto; max-width: 800px;">
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="margin: 0;">Processing Progress</h3>
-                <div>
-                    <span id="progress-count">0</span> / <span id="total-count">0</span> rows
-                </div>
-            </div>
-            <div id="model-info" style="margin-bottom: 15px; color: #666;">
-                Using model: <span id="current-model">Loading...</span>
-            </div>
-            <div style="width: 100%; height: 20px; background: #ddd; border-radius: 10px; overflow: hidden;">
-                <div id="progress-bar" style="width: 0%; height: 100%; background: #4CAF50; transition: width 0.3s ease;"></div>
-            </div>
-        </div>
-        <div id="log-container" style="background: #2c3e50; color: #fff; padding: 20px; border-radius: 8px; font-family: monospace; height: 300px; overflow-y: auto;">
-            <div id="log-content"></div>
-        </div>
+    <div class="log-container">
+        <h3>Processing Log</h3>
+        <div id="log-content"></div>
     </div>
 
     <!-- Classification Prompt Dialog -->
@@ -677,9 +708,8 @@
     {% endif %}
 
     <script>
-        // Store templates data globally to avoid template literal issues
-        const TEMPLATES = {{ sample_prompts|tojson|safe }};
-        
+        var TEMPLATES = {{ sample_prompts|tojson|safe }};
+
         function updateApiKey() {
             const apiKey = document.getElementById('api-key').value;
             fetch('/update_api_key', {
@@ -737,15 +767,13 @@
                     
                     // Update template select options based on mode
                     const templateSelect = document.getElementById('template-select');
-                    
-                    // Clear existing options
                     templateSelect.innerHTML = '';
                     
                     // Add new options based on mode
-                    const modeTemplates = mode === 'summarize' ? TEMPLATES.summarization : TEMPLATES.classification;
+                    const modeTemplates = mode === 'classify' ? TEMPLATES.classification : TEMPLATES.summarization;
                     for (const [key, template] of Object.entries(modeTemplates)) {
                         const option = document.createElement('option');
-                        option.value = `${mode === 'summarize' ? 'summarization' : 'classification'}.${key}`;
+                        option.value = `${mode === 'classify' ? 'classification' : 'summarization'}.${key}`;
                         option.textContent = template.name;
                         templateSelect.appendChild(option);
                     }
@@ -755,8 +783,23 @@
                         templateSelect.selectedIndex = 0;
                         updatePromptTemplate();
                     }
+
+                    // Update process button text
+                    const processButton = document.getElementById('process-button');
+                    const classifyButton = document.getElementById('classify-button');
+                    if (mode === 'classify') {
+                        processButton.style.display = 'none';
+                        classifyButton.style.display = 'inline-block';
+                    } else {
+                        processButton.style.display = 'inline-block';
+                        classifyButton.style.display = 'none';
+                    }
+
+                    // Reload the page to ensure all templates are properly updated
+                    location.reload();
                 }
-            });
+            })
+            .catch(error => console.error('Error:', error));
         }
 
         function updateColumn() {
@@ -776,90 +819,119 @@
             });
         }
 
-        function processData() {
-            const customPrompt = document.getElementById('custom-prompt').value;
+        function processData(mode) {
             const processButton = document.getElementById('process-button');
-            const processingLog = document.getElementById('processing-log');
+            const classifyButton = document.getElementById('classify-button');
             const logContent = document.getElementById('log-content');
-            const progressBar = document.getElementById('progress-bar');
-            const progressCount = document.getElementById('progress-count');
-            const totalCount = document.getElementById('total-count');
-            const currentModel = document.getElementById('current-model');
+            const customPrompt = document.getElementById('custom-prompt').value;
+            const originalSummarizeText = processButton.textContent;
+            const originalClassifyText = classifyButton ? classifyButton.textContent : '';
             
-            // Reset and show processing log
-            logContent.innerHTML = '';
-            processingLog.style.display = 'block';
+            // Disable buttons during processing
             processButton.disabled = true;
+            if (classifyButton) {
+                classifyButton.disabled = true;
+            }
             processButton.textContent = 'Processing...';
+            if (classifyButton) {
+                classifyButton.textContent = 'Processing...';
+            }
             
-            // Update model info
-            const modelSelect = document.getElementById('model-select');
-            const selectedOption = modelSelect.options[modelSelect.selectedIndex];
-            currentModel.textContent = selectedOption.text;
+            // Clear previous log
+            logContent.innerHTML = '';
             
-            // Create EventSource for Server-Sent Events
-            const eventSource = new EventSource('/process?' + new URLSearchParams({
-                custom_prompt: customPrompt
-            }).toString());
-
+            // Create EventSource for server-sent events
+            const params = new URLSearchParams({
+                custom_prompt: customPrompt,
+                mode: mode
+            });
+            
+            const eventSource = new EventSource(`/process?${params.toString()}`);
+            
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);
                 
-                if (data.status === 'processing') {
-                    // Update progress
-                    const percent = (data.current / data.total) * 100;
-                    progressBar.style.width = percent + '%';
-                    progressCount.textContent = data.current;
-                    totalCount.textContent = data.total;
-                    
-                    // Add log entry with truncated result
-                    const truncatedResult = data.result.length > 100 ? 
-                        data.result.substring(0, 100) + '...' : 
-                        data.result;
+                if (data.error) {
                     const logEntry = document.createElement('div');
-                    logEntry.innerHTML = `<span style="color: #4CAF50;">→</span> Row ${data.current}/${data.total}: ${truncatedResult}`;
+                    logEntry.innerHTML = '<span style="color: #ff5252;">❌</span> Error: ' + data.error;
                     logContent.appendChild(logEntry);
                     logContent.scrollTop = logContent.scrollHeight;
-                }
-                else if (data.status === 'complete') {
-                    // Download completed file
-                    window.location.href = data.file;
                     
-                    // Reset UI
+                    eventSource.close();
                     processButton.disabled = false;
-                    processButton.textContent = 'Process Data';
+                    processButton.textContent = originalSummarizeText;
+                    if (classifyButton) {
+                        classifyButton.disabled = false;
+                        classifyButton.textContent = originalClassifyText;
+                    }
+                    return;
+                }
+                
+                if (data.status === 'complete') {
+                    eventSource.close();
+                    processButton.disabled = false;
+                    processButton.textContent = originalSummarizeText;
+                    if (classifyButton) {
+                        classifyButton.disabled = false;
+                        classifyButton.textContent = originalClassifyText;
+                    }
                     
                     // Add completion message
                     const logEntry = document.createElement('div');
-                    logEntry.innerHTML = '<span style="color: #4CAF50;">✓</span> Processing complete! Downloading results...';
+                    logEntry.innerHTML = '<span style="color: #4CAF50;">✓</span> Processing complete!';
                     logContent.appendChild(logEntry);
                     
-                    // If this was a summarization, offer classification
-                    if (data.mode === 'summarize' && data.offer_classification) {
-                        setTimeout(showClassificationPrompt, 1000);
+                    // Store output path for potential classification
+                    if (data.output_path) {
+                        const previewContent = document.querySelector('.prompt-preview .preview-content');
+                        if (previewContent) {
+                            previewContent.setAttribute('data-output-path', data.output_path);
+                        }
                     }
                     
-                    // Close connection
-                    eventSource.close();
-                }
-                else if (data.error) {
-                    // Handle error
+                    // Automatically trigger download
+                    const downloadIframe = document.createElement('iframe');
+                    downloadIframe.style.display = 'none';
+                    downloadIframe.src = data.file;
+                    document.body.appendChild(downloadIframe);
+                    setTimeout(() => {
+                        document.body.removeChild(downloadIframe);
+                    }, 2000);
+                    
+                    // If this was a summarization and classification is offered
+                    if (data.offer_classification) {
+                        showClassificationPrompt();
+                    }
+                } else if (data.status === 'processing') {
+                    // Update progress in the original style
                     const logEntry = document.createElement('div');
-                    logEntry.innerHTML = `<span style="color: #ff5252;">❌</span> Error: ${data.error}`;
+                    const progress = Math.round((data.current / data.total) * 100);
+                    logEntry.innerHTML = '<span style="color: #4CAF50;">✓</span> Processed ' + data.current + ' of ' + data.total + ': ' + data.result;
                     logContent.appendChild(logEntry);
                     logContent.scrollTop = logContent.scrollHeight;
+                    
+                    // Update progress in button text
+                    processButton.textContent = 'Processing... ' + progress + '%';
+                    if (classifyButton) {
+                        classifyButton.textContent = 'Processing... ' + progress + '%';
+                    }
                 }
             };
-
+            
             eventSource.onerror = function(error) {
-                console.error('EventSource failed:', error);
+                console.error('EventSource error:', error);
+                eventSource.close();
+                
                 const logEntry = document.createElement('div');
                 logEntry.innerHTML = '<span style="color: #ff5252;">❌</span> Connection error. Please try again.';
                 logContent.appendChild(logEntry);
                 
                 processButton.disabled = false;
-                processButton.textContent = 'Process Data';
-                eventSource.close();
+                processButton.textContent = originalSummarizeText;
+                if (classifyButton) {
+                    classifyButton.disabled = false;
+                    classifyButton.textContent = originalClassifyText;
+                }
             };
         }
 
@@ -1029,24 +1101,32 @@
         }
 
         function proceedToClassification() {
-            // Close the prompt
             document.getElementById('classification-prompt').style.display = 'none';
+            const previewContent = document.querySelector('.prompt-preview .preview-content');
+            const outputPath = previewContent ? previewContent.getAttribute('data-output-path') : null;
             
-            // Switch to classification mode
-            updateMode('classify');
-            
-            // Update column select if it exists
-            const columnSelect = document.getElementById('column-select');
-            if (columnSelect) {
-                // Find the Summary option
-                const summaryOption = Array.from(columnSelect.options).find(opt => opt.value === 'Summary');
-                if (summaryOption) {
-                    summaryOption.selected = true;
-                    columnSelect.dispatchEvent(new Event('change'));
-                }
+            if (!outputPath) {
+                console.error('No output path found');
+                return;
             }
             
-            // Scroll to top
+            fetch('/store_summary_path', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ output_path: outputPath })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateMode('classification');
+                } else {
+                    console.error('Error storing summary path:', data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+            
             window.scrollTo(0, 0);
         }
     </script>
