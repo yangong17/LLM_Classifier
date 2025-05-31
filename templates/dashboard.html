@@ -498,6 +498,211 @@
             margin-right: 8px;
             font-weight: bold;
         }
+
+        .analysis-container {
+            display: none;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+
+        .analysis-container.active {
+            display: block;
+        }
+
+        .column-selection {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .column-list {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            min-height: 200px;
+        }
+
+        .column-list h4 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        .column-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .column-item:hover {
+            background: #e3f2fd;
+        }
+
+        .column-item.selected {
+            background: #bbdefb;
+        }
+
+        .analysis-button {
+            display: block;
+            margin: 30px auto;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .analysis-button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .analysis-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .analysis-results {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .analysis-results.active {
+            display: block;
+        }
+
+        .correlation-table {
+            width: 100%;
+            margin: 20px 0;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .correlation-table th,
+        .correlation-table td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+
+        .correlation-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+
+        .correlation-value {
+            font-family: monospace;
+        }
+
+        .distribution-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);  /* Changed from auto-fit to 2 columns */
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .distribution-plot {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .loading-spinner.active {
+            display: block;
+        }
+
+        .loading-spinner::after {
+            content: '';
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .pearson-correlation {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .pearson-bar {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .pearson-label {
+            width: 200px;
+            font-weight: bold;
+        }
+
+        .pearson-value {
+            width: 80px;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        .pearson-bar-graph {
+            flex-grow: 1;
+            margin: 0 20px;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .pearson-bar-fill {
+            height: 100%;
+            position: absolute;
+            left: 0;  /* Changed from 50% to 0 */
+            transform: none;  /* Removed translateX */
+            transition: width 0.3s ease;
+        }
+
+        .pearson-bar-fill.positive {
+            background: rgba(76, 175, 80, 0.6);
+            border-right: 2px solid #4CAF50;
+        }
+
+        .pearson-bar-fill.negative {
+            background: rgba(244, 67, 54, 0.6);
+            border-right: 2px solid #f44336;
+        }
     </style>
 </head>
 <body>
@@ -587,128 +792,183 @@
                 onclick="updateMode('summarize')">Summarization Mode</button>
         <button class="mode-button {% if session.get('mode') == 'classify' %}active{% endif %}" 
                 onclick="updateMode('classify')">Classification Mode</button>
+        <button class="mode-button {% if session.get('mode') == 'analyze' %}active{% endif %}" 
+                onclick="updateMode('analyze')">Analysis Mode</button>
     </div>
 
-    <!-- Dataset Stats -->
-    <div class="stats-container">
-        <h2>Dataset Statistics</h2>
-        {% if stats %}
-        <div class="stats-grid">
-            <div class="stat-box">
-                <h4>Basic Stats</h4>
-                <p>Total Rows: {{ stats.row_count }}</p>
-                <p>Average Characters: {{ stats.mean_chars }}</p>
-                <p>Median Characters: {{ stats.median_chars }}</p>
-                <p>Total Characters: {{ stats.total_chars }}</p>
-            </div>
-            
-            {% for model, cost in stats.costs.items() %}
-            <div class="stat-box model-cost">
-                <h5>{{ cost.display_name }}</h5>
-                <div class="cost-grid">
-                    <div class="cost-section">
-                        <h6>Input Costs (per 1M tokens)</h6>
-                        <p>Regular: ${{ "%.2f"|format(cost.input_price) }}</p>
-                        <p>Cached: ${{ "%.2f"|format(cost.cached_input_price) }}</p>
+    <!-- Analysis Interface -->
+    <div id="analysis-container" class="analysis-container {% if session.get('mode') == 'analyze' %}active{% endif %}">
+        <h2>Select Variables for Analysis</h2>
+        <div class="column-selection">
+            <div class="column-list">
+                <h4>Predictor Variables</h4>
+                <div id="predictor-columns">
+                    {% for column in columns %}
+                    <div class="column-item" onclick="togglePredictorColumn(this, '{{ column }}')">
+                        <input type="checkbox" id="pred-{{ column }}" value="{{ column }}">
+                        <label for="pred-{{ column }}">{{ column }}</label>
                     </div>
-                    <div class="cost-section">
-                        <h6>Output Cost (per 1M tokens)</h6>
-                        <p>${{ "%.2f"|format(cost.output_price) }}</p>
-                    </div>
-                </div>
-                <div class="total-cost">
-                    <p>Total Cost (Regular): ${{ cost.estimated_total_cost }}</p>
-                    <p>Total Cost (Cached): ${{ cost.estimated_total_cost_cached }}</p>
+                    {% endfor %}
                 </div>
             </div>
-            {% endfor %}
+            <div class="column-list">
+                <h4>Outcome Variable</h4>
+                <div id="outcome-columns">
+                    {% for column in columns %}
+                    <div class="column-item" onclick="toggleOutcomeColumn(this, '{{ column }}')">
+                        <input type="radio" name="outcome" id="out-{{ column }}" value="{{ column }}">
+                        <label for="out-{{ column }}">{{ column }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
-        {% endif %}
+        <button id="analyze-button" class="analysis-button" onclick="runAnalysis()" disabled>Run Analysis</button>
+        
+        <!-- Loading Spinner -->
+        <div id="analysis-loading" class="loading-spinner">
+            Analyzing data...
+        </div>
+        
+        <!-- Analysis Results -->
+        <div id="analysis-results" class="analysis-results">
+            <h3>Pearson Correlation with Outcome</h3>
+            <div id="pearson-correlation" class="pearson-correlation"></div>
+            
+            <h3>Full Correlation Matrix</h3>
+            <div id="correlation-table"></div>
+            
+            <h3>Distribution Analysis</h3>
+            <div id="distribution-grid" class="distribution-grid"></div>
+        </div>
     </div>
 
-    <!-- Content Layout -->
-    <div class="content-layout">
-        <!-- Left Side: Column Preview with Tabs -->
-        <div class="preview-box">
-            <h3>CSV Data Preview</h3>
-            <div class="tabs">
-                {% for i in range(5) %}
-                <button class="tab-button {% if loop.first %}active{% endif %}" onclick="showTab({{ i }})">Entry {{ i + 1 }}</button>
-                {% endfor %}
-            </div>
-            {% if preview_data %}
-                {% for i in range(5) %}
-                <div class="preview-content {% if loop.first %}active{% endif %}" id="tab-{{ i }}">
-                    {{ preview_data[i] if preview_data|length > i else 'No data available' }}
+    <!-- Regular Interface (Stats, Template, Preview) -->
+    <div id="regular-container" style="display: {% if session.get('mode') == 'analyze' %}none{% else %}block{% endif %}">
+        <!-- Dataset Stats -->
+        <div class="stats-container">
+            <h2>Dataset Statistics</h2>
+            {% if stats %}
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <h4>Basic Stats</h4>
+                    <p>Total Rows: {{ stats.row_count }}</p>
+                    <p>Average Characters: {{ stats.mean_chars }}</p>
+                    <p>Median Characters: {{ stats.median_chars }}</p>
+                    <p>Total Characters: {{ stats.total_chars }}</p>
+                </div>
+                
+                {% for model, cost in stats.costs.items() %}
+                <div class="stat-box model-cost">
+                    <h5>{{ cost.display_name }}</h5>
+                    <div class="cost-grid">
+                        <div class="cost-section">
+                            <h6>Input Costs (per 1M tokens)</h6>
+                            <p>Regular: ${{ "%.2f"|format(cost.input_price) }}</p>
+                            <p>Cached: ${{ "%.2f"|format(cost.cached_input_price) }}</p>
+                        </div>
+                        <div class="cost-section">
+                            <h6>Output Cost (per 1M tokens)</h6>
+                            <p>${{ "%.2f"|format(cost.output_price) }}</p>
+                        </div>
+                    </div>
+                    <div class="total-cost">
+                        <p>Total Cost (Regular): ${{ cost.estimated_total_cost }}</p>
+                        <p>Total Cost (Cached): ${{ cost.estimated_total_cost_cached }}</p>
+                    </div>
                 </div>
                 {% endfor %}
+            </div>
             {% endif %}
         </div>
 
-        <!-- Right Side: Template and Preview -->
-        <div class="right-column">
-            <!-- Template Box -->
-            <div class="template-box">
-                <h3>Prompt Template</h3>
-                <div class="horizontal-arrow"></div>
-                <div class="template-controls">
-                    <select id="template-select" onchange="updatePromptTemplate()">
-                        {% if session.get('mode') == 'classify' %}
-                            {% for key, template in sample_prompts.classification.items() %}
-                            <option value="classification.{{ key }}">
-                                {{ template.name }}
-                            </option>
-                            {% endfor %}
-                        {% else %}
-                            {% for key, template in sample_prompts.summarization.items() %}
-                            <option value="summarization.{{ key }}">
-                                {{ template.name }}
-                            </option>
-                            {% endfor %}
-                        {% endif %}
-                    </select>
+        <!-- Content Layout -->
+        <div class="content-layout">
+            <!-- Left Side: Column Preview with Tabs -->
+            <div class="preview-box">
+                <h3>CSV Data Preview</h3>
+                <div class="tabs">
+                    {% for i in range(5) %}
+                    <button class="tab-button {% if loop.first %}active{% endif %}" onclick="showTab({{ i }})">Entry {{ i + 1 }}</button>
+                    {% endfor %}
                 </div>
-                <textarea id="custom-prompt">{{ prompt_template }}</textarea>
+                {% if preview_data %}
+                    {% for i in range(5) %}
+                    <div class="preview-content {% if loop.first %}active{% endif %}" id="tab-{{ i }}">
+                        {{ preview_data[i] if preview_data|length > i else 'No data available' }}
+                    </div>
+                    {% endfor %}
+                {% endif %}
             </div>
 
-            <!-- Flow Arrow -->
-            <div class="flow-arrow"></div>
+            <!-- Right Side: Template and Preview -->
+            <div class="right-column">
+                <!-- Template Box -->
+                <div class="template-box">
+                    <h3>Prompt Template</h3>
+                    <div class="horizontal-arrow"></div>
+                    <div class="template-controls">
+                        <select id="template-select" onchange="updatePromptTemplate()">
+                            {% if session.get('mode') == 'classify' %}
+                                {% for key, template in sample_prompts.classification.items() %}
+                                <option value="classification.{{ key }}">
+                                    {{ template.name }}
+                                </option>
+                                {% endfor %}
+                            {% else %}
+                                {% for key, template in sample_prompts.summarization.items() %}
+                                <option value="summarization.{{ key }}">
+                                    {{ template.name }}
+                                </option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                    <textarea id="custom-prompt">{{ prompt_template }}</textarea>
+                </div>
 
-            <!-- Preview Box -->
-            <div class="prompt-preview">
-                <h3>Full Prompt Preview</h3>
-                <div class="preview-content">
-                    {{ prompt_preview|replace(preview_data[0] if preview_data else '', '<span class="csv-data">' + (preview_data[0] if preview_data else '') + '</span>')|safe if prompt_preview else 'No preview available' }}
+                <!-- Flow Arrow -->
+                <div class="flow-arrow"></div>
+
+                <!-- Preview Box -->
+                <div class="prompt-preview">
+                    <h3>Full Prompt Preview</h3>
+                    <div class="preview-content">
+                        {{ prompt_preview|replace(preview_data[0] if preview_data else '', '<span class="csv-data">' + (preview_data[0] if preview_data else '') + '</span>')|safe if prompt_preview else 'No preview available' }}
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Process Button -->
-    <div class="process-button-container">
-        <button id="process-button" class="process-button" onclick="processData('summarize')">Summarize Data</button>
-        <button id="classify-button" class="process-button" onclick="processData('classify')" style="margin-left: 20px; background-color: #2196F3;">Classify Data</button>
-    </div>
+        <!-- Process Button -->
+        <div class="process-button-container">
+            <button id="process-button" class="process-button" onclick="processData('summarize')">Summarize Data</button>
+            <button id="classify-button" class="process-button" onclick="processData('classify')" style="margin-left: 20px; background-color: #2196F3;">Classify Data</button>
+        </div>
 
-    <!-- Processing Log -->
-    <div class="log-container">
-        <h3>Processing Log</h3>
-        <div id="log-content"></div>
-    </div>
+        <!-- Processing Log -->
+        <div class="log-container">
+            <h3>Processing Log</h3>
+            <div id="log-content"></div>
+        </div>
 
-    <!-- Classification Prompt Dialog -->
-    <div id="classification-prompt" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000; max-width: 500px; width: 90%;">
-        <h3 style="margin-top: 0;">Proceed to Classification?</h3>
-        <p>Would you like to classify the summarized content?</p>
-        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-            <button onclick="closeClassificationPrompt()" style="padding: 8px 16px; border: 1px solid #ddd; background: #f5f5f5; border-radius: 4px; cursor: pointer;">No, Skip</button>
-            <button onclick="proceedToClassification()" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Yes, Proceed</button>
+        <!-- Classification Prompt Dialog -->
+        <div id="classification-prompt" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000; max-width: 500px; width: 90%;">
+            <h3 style="margin-top: 0;">Proceed to Classification?</h3>
+            <p>Would you like to classify the summarized content?</p>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button onclick="closeClassificationPrompt()" style="padding: 8px 16px; border: 1px solid #ddd; background: #f5f5f5; border-radius: 4px; cursor: pointer;">No, Skip</button>
+                <button onclick="proceedToClassification()" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Yes, Proceed</button>
+            </div>
         </div>
     </div>
     {% endif %}
 
     <script>
         var TEMPLATES = {{ sample_prompts|tojson|safe }};
+
+        var selectedPredictors = new Set();
+        var selectedOutcome = null;
 
         function updateApiKey() {
             const apiKey = document.getElementById('api-key').value;
@@ -765,41 +1025,42 @@
                     document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
                     document.querySelector(`.mode-button[onclick="updateMode('${mode}')"]`).classList.add('active');
                     
-                    // Update template select options based on mode
-                    const templateSelect = document.getElementById('template-select');
-                    templateSelect.innerHTML = '';
+                    // Show/hide appropriate containers
+                    var analysisContainer = document.getElementById('analysis-container');
+                    var regularContainer = document.getElementById('regular-container');
                     
-                    // Add new options based on mode
-                    const modeTemplates = mode === 'classify' ? TEMPLATES.classification : TEMPLATES.summarization;
-                    for (const [key, template] of Object.entries(modeTemplates)) {
-                        const option = document.createElement('option');
-                        option.value = `${mode === 'classify' ? 'classification' : 'summarization'}.${key}`;
-                        option.textContent = template.name;
-                        templateSelect.appendChild(option);
-                    }
-                    
-                    // Set first template as selected and update
-                    if (templateSelect.options.length > 0) {
-                        templateSelect.selectedIndex = 0;
-                        updatePromptTemplate();
-                    }
-
-                    // Update process button text
-                    const processButton = document.getElementById('process-button');
-                    const classifyButton = document.getElementById('classify-button');
-                    if (mode === 'classify') {
-                        processButton.style.display = 'none';
-                        classifyButton.style.display = 'inline-block';
+                    if (mode === 'analyze') {
+                        analysisContainer.classList.add('active');
+                        regularContainer.classList.add('d-none');
                     } else {
-                        processButton.style.display = 'inline-block';
-                        classifyButton.style.display = 'none';
+                        analysisContainer.classList.remove('active');
+                        regularContainer.classList.remove('d-none');
+                        
+                        // Update template select options based on mode
+                        var templateSelect = document.getElementById('template-select');
+                        templateSelect.innerHTML = '';
+                        
+                        // Add new options based on mode
+                        var modeTemplates = mode === 'classify' ? TEMPLATES.classification : TEMPLATES.summarization;
+                        for (var key in modeTemplates) {
+                            var template = modeTemplates[key];
+                            var option = document.createElement('option');
+                            option.value = mode === 'classify' ? 'classification.' + key : 'summarization.' + key;
+                            option.textContent = template.name;
+                            templateSelect.appendChild(option);
+                        }
+                        
+                        // Set first template as selected and update
+                        if (templateSelect.options.length > 0) {
+                            templateSelect.selectedIndex = 0;
+                            updatePromptTemplate();
+                        }
                     }
-
-                    // Reload the page to ensure all templates are properly updated
-                    location.reload();
                 }
             })
-            .catch(error => console.error('Error:', error));
+            .catch(function(error) {
+                console.error('Error:', error);
+            });
         }
 
         function updateColumn() {
@@ -1129,6 +1390,236 @@
             
             window.scrollTo(0, 0);
         }
+
+        function togglePredictorColumn(element, column) {
+            var checkbox = element.querySelector('input[type="checkbox"]');
+            checkbox.checked = !checkbox.checked;
+            
+            if (checkbox.checked) {
+                selectedPredictors.add(column);
+                element.classList.add('selected');
+            } else {
+                selectedPredictors.delete(column);
+                element.classList.remove('selected');
+            }
+            
+            updateAnalyzeButton();
+        }
+
+        function toggleOutcomeColumn(element, column) {
+            var radio = element.querySelector('input[type="radio"]');
+            radio.checked = true;
+            selectedOutcome = column;
+            
+            // Update styling for all outcome columns
+            document.querySelectorAll('#outcome-columns .column-item').forEach(function(item) {
+                item.classList.remove('selected');
+            });
+            element.classList.add('selected');
+            
+            // Remove this column from predictors if it was selected
+            if (selectedPredictors.has(column)) {
+                var predictorElement = document.querySelector('#pred-' + column).parentElement;
+                togglePredictorColumn(predictorElement, column);
+            }
+            
+            updateAnalyzeButton();
+        }
+
+        function updateAnalyzeButton() {
+            var analyzeButton = document.getElementById('analyze-button');
+            analyzeButton.disabled = selectedPredictors.size === 0 || !selectedOutcome;
+        }
+
+        function runAnalysis() {
+            // Show loading spinner
+            document.getElementById('analysis-loading').classList.add('active');
+            document.getElementById('analysis-results').classList.remove('active');
+            
+            // Get selected variables
+            const data = {
+                predictors: Array.from(selectedPredictors),
+                outcome: selectedOutcome
+            };
+            
+            // Send analysis request
+            fetch('/run_analysis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Hide loading spinner
+                    document.getElementById('analysis-loading').classList.remove('active');
+                    document.getElementById('analysis-results').classList.add('active');
+                    
+                    // Display correlation table
+                    displayCorrelationTable(data.correlations);
+                    
+                    // Display distribution plots
+                    displayDistributions(data.distributions);
+                } else {
+                    alert('Error running analysis: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error running analysis. Please try again.');
+            })
+            .finally(() => {
+                document.getElementById('analysis-loading').classList.remove('active');
+            });
+        }
+
+        function displayCorrelationTable(correlations) {
+            // Display Pearson correlations with outcome
+            const pearsonContainer = document.getElementById('pearson-correlation');
+            const predictorCorrelations = [];
+            
+            selectedPredictors.forEach(predictor => {
+                const correlation = correlations[`${predictor}-${selectedOutcome}`] || correlations[`${selectedOutcome}-${predictor}`] || 0;
+                predictorCorrelations.push({
+                    predictor,
+                    correlation
+                });
+            });
+            
+            // Sort by absolute correlation value
+            predictorCorrelations.sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation));
+            
+            let pearsonHtml = '';
+            predictorCorrelations.forEach(({ predictor, correlation }) => {
+                const absCorrelation = Math.abs(correlation);
+                const barWidth = Math.min(Math.abs(correlation * 100), 100);
+                const formattedCorr = correlation.toFixed(3);
+                
+                pearsonHtml += `
+                    <div class="pearson-bar">
+                        <div class="pearson-label">${predictor}</div>
+                        <div class="pearson-bar-graph">
+                            <div class="pearson-bar-fill ${correlation >= 0 ? 'positive' : 'negative'}" 
+                                 style="width: ${barWidth}%"></div>
+                        </div>
+                        <div class="pearson-value">${formattedCorr}</div>
+                    </div>
+                `;
+            });
+            
+            pearsonContainer.innerHTML = pearsonHtml;
+            
+            // Display full correlation matrix
+            const tableContainer = document.getElementById('correlation-table');
+            const variables = [...selectedPredictors, selectedOutcome];
+            
+            let html = '<table class="correlation-table"><tr><th>Variable</th>';
+            variables.forEach(v => {
+                html += `<th>${v}</th>`;
+            });
+            html += '</tr>';
+            
+            variables.forEach(v1 => {
+                html += `<tr><td><strong>${v1}</strong></td>`;
+                variables.forEach(v2 => {
+                    const correlation = correlations[`${v1}-${v2}`] || correlations[`${v2}-${v1}`] || (v1 === v2 ? 1 : 0);
+                    const formattedCorr = correlation.toFixed(3);
+                    const color = getCorrelationColor(correlation);
+                    html += `<td class="correlation-value" style="background-color: ${color}">${formattedCorr}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</table>';
+            
+            tableContainer.innerHTML = html;
+        }
+
+        function getCorrelationColor(correlation) {
+            const absCorr = Math.abs(correlation);
+            const alpha = absCorr * 0.5; // Adjust color intensity
+            return correlation >= 0 
+                ? `rgba(0, 255, 0, ${alpha})` // Green for positive correlations
+                : `rgba(255, 0, 0, ${alpha})`; // Red for negative correlations
+        }
+
+        function displayDistributions(distributions) {
+            const container = document.getElementById('distribution-grid');
+            container.innerHTML = ''; // Clear previous plots
+            
+            // Create a plot for each predictor variable
+            selectedPredictors.forEach(variable => {
+                const plotData = distributions[variable];
+                if (plotData) {
+                    const plotDiv = document.createElement('div');
+                    plotDiv.className = 'distribution-plot';
+                    plotDiv.innerHTML = `
+                        <h4>${variable} Distribution</h4>
+                        <div id="plot-${variable}" style="height: 400px;"></div>  <!-- Added fixed height -->
+                        <div style="margin-top: 10px; font-size: 0.9em;">
+                            <strong>Statistics:</strong><br>
+                            Mean: ${plotData.mean.toFixed(2)}<br>
+                            Std Dev: ${plotData.std.toFixed(2)}<br>
+                            Min: ${plotData.min.toFixed(2)}<br>
+                            Max: ${plotData.max.toFixed(2)}
+                        </div>
+                    `;
+                    container.appendChild(plotDiv);
+                    
+                    // Calculate number of bins based on data range and Sturges' formula
+                    const n = plotData.values.length;
+                    const numBins = Math.ceil(Math.log2(n) + 1);
+                    
+                    // Create the plot using plotly.js with improved styling
+                    Plotly.newPlot(`plot-${variable}`, [{
+                        x: plotData.values,
+                        type: 'histogram',
+                        name: variable,
+                        nbinsx: numBins,
+                        marker: {
+                            color: 'rgba(76, 175, 80, 0.6)',
+                            line: {
+                                color: '#4CAF50',
+                                width: 1
+                            }
+                        }
+                    }], {
+                        title: {
+                            text: `Distribution of ${variable}`,
+                            font: {
+                                size: 16
+                            }
+                        },
+                        xaxis: {
+                            title: variable,
+                            tickfont: {
+                                size: 12
+                            }
+                        },
+                        yaxis: {
+                            title: 'Frequency',
+                            tickfont: {
+                                size: 12
+                            }
+                        },
+                        bargap: 0.1,
+                        margin: {
+                            l: 50,
+                            r: 20,
+                            t: 40,
+                            b: 40
+                        },
+                        height: 400  // Added fixed height
+                    }, {
+                        responsive: true
+                    });
+                }
+            });
+        }
     </script>
+
+    <!-- Add Plotly.js for distribution plots -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </body>
 </html> 

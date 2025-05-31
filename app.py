@@ -387,15 +387,24 @@ def index():
                             columns=session.get('columns', []),
                             selected_column=session.get('selected_column'))
     
-    # Calculate stats if we have both file and column
+    # Calculate stats if we have both file and column and not in analysis mode
     stats = None
-    if 'csv_path' in session and 'selected_column' in session:
+    if 'csv_path' in session and 'selected_column' in session and session.get('mode') != 'analyze':
         try:
             df = pd.read_csv(session['csv_path'])
             selected_model = session.get('model', 'gpt-4.1')
             stats = calculate_stats(df, session['selected_column'], selected_model)
         except Exception as e:
             print(f"Error calculating stats: {str(e)}")
+    
+    # Get all columns for analysis mode
+    columns = []
+    if session.get('mode') == 'analyze' and 'csv_path' in session:
+        try:
+            df = pd.read_csv(session['csv_path'])
+            columns = df.columns.tolist()
+        except Exception as e:
+            print(f"Error getting columns: {str(e)}")
     
     return render_template('dashboard.html',
                         step='dashboard',
@@ -404,13 +413,14 @@ def index():
                         api_key=mask_api_key(os.getenv('OPENAI_API_KEY')),
                         model=os.getenv('MODEL', 'gpt-4.1'),
                         models=MODEL_PRICING,
-                        columns=session.get('columns', []),
+                        columns=columns,
                         selected_column=session.get('selected_column'),
-                        preview_data=get_preview_data(),
+                        preview_data=get_preview_data() if session.get('mode') != 'analyze' else None,
                         stats=stats,
                         sample_prompts=SAMPLE_PROMPTS,
-                        prompt_template=request.form.get('custom_prompt', SAMPLE_PROMPTS['summarization']['default']['template']),
-                        prompt_preview=get_prompt_preview())
+                        prompt_template=request.form.get('custom_prompt', SAMPLE_PROMPTS['summarization']['default']['template']) if session.get('mode') != 'analyze' else None,
+                        prompt_preview=get_prompt_preview() if session.get('mode') != 'analyze' else None,
+                        mode=session.get('mode', 'summarize'))
 
 @app.route('/upload_file', methods=['POST'])
 def upload_file():
@@ -533,11 +543,14 @@ def update_model():
 def update_mode():
     data = request.get_json()
     mode = data.get('mode')
-    if mode in ['summarize', 'classify']:
+    if mode in ['summarize', 'classify', 'analyze']:
         session['mode'] = mode
         # Update template based on mode
         if mode == 'classify':
             session['template'] = SAMPLE_PROMPTS['classification']['default']['template']
+        elif mode == 'analyze':
+            # No template needed for analysis mode
+            session['template'] = None
         else:
             session['template'] = SAMPLE_PROMPTS['summarization']['default']['template']
     return jsonify({'status': 'success'})
@@ -700,6 +713,58 @@ def download_file(filename):
         )
     except Exception as e:
         return f"Error downloading file: {str(e)}", 404
+
+@app.route('/run_analysis', methods=['POST'])
+def run_analysis():
+    try:
+        data = request.get_json()
+        predictors = data.get('predictors', [])
+        outcome = data.get('outcome')
+        
+        if not predictors or not outcome:
+            return jsonify({
+                'status': 'error',
+                'message': 'Please select both predictor and outcome variables'
+            }), 400
+        
+        # Read the CSV file
+        df = pd.read_csv(session['csv_path'])
+        
+        # Calculate correlations
+        variables = predictors + [outcome]
+        correlation_matrix = df[variables].corr()
+        
+        # Format correlations as a dictionary
+        correlations = {}
+        for v1 in variables:
+            for v2 in variables:
+                correlations[f"{v1}-{v2}"] = correlation_matrix.loc[v1, v2]
+        
+        # Calculate distributions for predictor variables
+        distributions = {}
+        for var in predictors:
+            values = df[var].dropna().tolist()
+            distributions[var] = {
+                'values': values,
+                'mean': float(np.mean(values)),
+                'std': float(np.std(values)),
+                'min': float(np.min(values)),
+                'max': float(np.max(values))
+            }
+        
+        return jsonify({
+            'status': 'success',
+            'correlations': correlations,
+            'distributions': distributions
+        })
+        
+    except Exception as e:
+        print(f"Error in analysis: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
