@@ -3,6 +3,31 @@
 <head>
     <title>LLM Classifier Dashboard</title>
     <style>
+        :root {
+            --gunmetal: #2C3539;
+            --hover-gunmetal: #3C4549;
+            
+            /* Main colors - bright but not oversaturated */
+            --bright-green: #7AC7A3;
+            --bright-blue: #82B7E8;
+            --bright-orange: #FFA665;
+            
+            /* Active/Selected states - more saturated */
+            --active-green: #4CAF8A;
+            --active-blue: #4A90E2;
+            --active-orange: #FF8533;
+            
+            /* Muted states for inactive buttons */
+            --muted-green: #A8D5BE;
+            --muted-blue: #B3D1ED;
+            --muted-orange: #FFBF99;
+            
+            /* Hover states - slightly brighter than active */
+            --hover-green: #90DFB8;
+            --hover-blue: #99CCFF;
+            --hover-orange: #FFB380;
+        }
+
         body {
             font-family: Arial, sans-serif;
             max-width: 1200px;
@@ -45,11 +70,11 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            background-color: #4CAF50;
+            background-color: var(--gunmetal);
             color: white;
         }
         .button:hover {
-            background-color: #45a049;
+            background-color: var(--hover-gunmetal);
         }
         select, input {
             padding: 8px;
@@ -85,17 +110,18 @@
         .step {
             padding: 10px 20px;
             margin: 0 10px;
-            background: #ddd;
+            background: var(--gunmetal);
             border-radius: 20px;
             font-size: 0.9em;
+            color: white;
         }
         .step.active {
-            background: #4CAF50;
-            color: white;
+            background: var(--gunmetal);
+            opacity: 1;
         }
         .step.completed {
-            background: #81C784;
-            color: white;
+            background: var(--gunmetal);
+            opacity: 0.8;
         }
         .stats-container {
             margin: 20px 0;
@@ -233,13 +259,17 @@
             padding: 8px 16px;
             border: none;
             border-radius: 4px;
-            background: #f0f0f0;
+            background: var(--gunmetal);
+            color: white;
             cursor: pointer;
         }
 
+        .tab-button:hover {
+            background: var(--hover-gunmetal);
+        }
+
         .tab-button.active {
-            background: #4CAF50;
-            color: white;
+            background: var(--gunmetal);
         }
 
         .template-controls {
@@ -408,21 +438,19 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            background-color: #e6f3ff;  /* Light blue background */
-            color: #2196F3;  /* Blue text */
             transition: all 0.3s ease;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: white;
+            opacity: 0.85; /* Slightly muted by default */
         }
 
         .mode-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            background-color: #bbdefb;  /* Slightly darker blue on hover */
         }
 
         .mode-button.active {
-            background-color: #2196F3;  /* Solid blue when active */
-            color: white;
+            background-color: var(--gunmetal);
         }
 
         .process-button-container {
@@ -434,7 +462,7 @@
         .process-button {
             padding: 20px 40px;
             font-size: 1.2em;
-            background-color: #4CAF50;
+            background-color: var(--gunmetal);
             color: white;
             border: none;
             border-radius: 8px;
@@ -446,7 +474,7 @@
         .process-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            background-color: #45a049;
+            background-color: var(--hover-gunmetal);
         }
 
         .template-box {
@@ -556,7 +584,7 @@
             margin: 30px auto;
             padding: 15px 40px;
             font-size: 1.1em;
-            background-color: #4CAF50;
+            background-color: var(--gunmetal);
             color: white;
             border: none;
             border-radius: 8px;
@@ -565,7 +593,7 @@
         }
 
         .analysis-button:hover {
-            background-color: #45a049;
+            background-color: var(--hover-gunmetal);
             transform: translateY(-2px);
         }
 
@@ -702,6 +730,105 @@
         .pearson-bar-fill.negative {
             background: rgba(244, 67, 54, 0.6);
             border-right: 2px solid #f44336;
+        }
+
+        /* Summarization mode */
+        .mode-button[onclick*="'summarize'"] {
+            background-color: var(--muted-green);
+        }
+        .mode-button[onclick*="'summarize'"]:hover {
+            background-color: var(--hover-green);
+            opacity: 1;
+        }
+        .mode-button[onclick*="'summarize'"].active {
+            background-color: var(--active-green);
+            opacity: 1;
+        }
+
+        /* Classification mode */
+        .mode-button[onclick*="'classify'"] {
+            background-color: var(--muted-blue);
+        }
+        .mode-button[onclick*="'classify'"]:hover {
+            background-color: var(--hover-blue);
+            opacity: 1;
+        }
+        .mode-button[onclick*="'classify'"].active {
+            background-color: var(--active-blue);
+            opacity: 1;
+        }
+
+        /* Analysis mode */
+        .mode-button[onclick*="'analyze'"] {
+            background-color: var(--muted-orange);
+        }
+        .mode-button[onclick*="'analyze'"]:hover {
+            background-color: var(--hover-orange);
+            opacity: 1;
+        }
+        .mode-button[onclick*="'analyze'"].active {
+            background-color: var(--active-orange);
+            opacity: 1;
+        }
+
+        /* Process buttons - match their respective modes */
+        #process-button {
+            background-color: var(--bright-green);
+            padding: 20px 40px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: white;
+        }
+
+        #classify-button {
+            background-color: var(--bright-blue);
+            padding: 20px 40px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: white;
+            margin-left: 20px;
+        }
+
+        /* Hover states - even brighter */
+        #process-button:hover {
+            background-color: var(--active-green);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        #classify-button:hover {
+            background-color: var(--active-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        /* Active states - match mode buttons */
+        .mode-button[onclick*="'summarize'"].active ~ .process-button-container #process-button {
+            background-color: var(--active-green);
+        }
+
+        .mode-button[onclick*="'classify'"].active ~ .process-button-container #classify-button {
+            background-color: var(--active-blue);
+        }
+
+        /* Add transition for smooth color changes */
+        .mode-button, .button, .tab-button {
+            transition: all 0.3s ease;
+        }
+
+        /* Ensure non-active mode buttons and their process buttons stay muted */
+        body[data-active-mode="summarize"] .mode-button:not([onclick*="'summarize'"]),
+        body[data-active-mode="classify"] .mode-button:not([onclick*="'classify'"]),
+        body[data-active-mode="analyze"] .mode-button:not([onclick*="'analyze'"]) {
+            opacity: 0.7;
         }
     </style>
 </head>
@@ -942,8 +1069,12 @@
 
         <!-- Process Button -->
         <div class="process-button-container">
-            <button id="process-button" class="process-button" onclick="processData('summarize')">Summarize Data</button>
-            <button id="classify-button" class="process-button" onclick="processData('classify')" style="margin-left: 20px; background-color: #2196F3;">Classify Data</button>
+            <button id="process-button" class="process-button" onclick="processData('{% if session.get('mode') == 'classify' %}classify{% else %}summarize{% endif %}')">
+                {% if session.get('mode') == 'classify' %}Classify Data{% else %}Summarize Data{% endif %}
+            </button>
+            {% if session.get('mode') != 'classify' %}
+            <button id="classify-button" class="process-button" onclick="processData('classify')">Classify Data</button>
+            {% endif %}
         </div>
 
         <!-- Processing Log -->
@@ -1022,7 +1153,6 @@
             .then(data => {
                 if (data.status === 'success') {
                     // If switching from analyze mode to another mode, do a full page reload
-                    // to ensure all server-side data is properly loaded
                     const currentMode = document.querySelector('.mode-button.active').textContent.toLowerCase().includes('analysis') ? 'analyze' : 
                                       document.querySelector('.mode-button.active').textContent.toLowerCase().includes('classify') ? 'classify' : 'summarize';
                     
@@ -1031,10 +1161,12 @@
                         return;
                     }
                     
-                    // For other mode switches, update UI without reload
                     // Update mode button styling
                     document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
                     document.querySelector(`.mode-button[onclick="updateMode('${mode}')"]`).classList.add('active');
+                    
+                    // Update body attribute for mode-specific styling
+                    updateModeStyles(mode);
                     
                     // Show/hide appropriate containers
                     var analysisContainer = document.getElementById('analysis-container');
@@ -1067,10 +1199,17 @@
                             updatePromptTemplate();
                         }
                         
-                        // Update process button text based on mode
+                        // Update process button text and visibility
                         var processButton = document.getElementById('process-button');
+                        var classifyButton = document.getElementById('classify-button');
+                        
                         if (processButton) {
                             processButton.textContent = mode === 'classify' ? 'Classify Data' : 'Summarize Data';
+                            processButton.onclick = function() { processData(mode); };
+                        }
+                        
+                        if (classifyButton) {
+                            classifyButton.style.display = mode === 'classify' ? 'none' : 'inline-block';
                         }
                     }
                 }
@@ -1659,6 +1798,10 @@
                     });
                 }
             });
+        }
+
+        function updateModeStyles(mode) {
+            document.body.setAttribute('data-active-mode', mode);
         }
     </script>
 
