@@ -4,8 +4,8 @@
     <title>LLM Classifier Dashboard</title>
     <style>
         :root {
-            --gunmetal: #2C3539;
-            --hover-gunmetal: #3C4549;
+            --gunmetal: #6B7177;
+            --hover-gunmetal: #848A91;
             
             /* Main colors - bright but not oversaturated */
             --bright-green: #7AC7A3;
@@ -417,12 +417,12 @@
         }
 
         .preview-content::-webkit-scrollbar-thumb {
-            background: #4CAF50;
+            background: #6B7177;
             border-radius: 4px;
         }
 
         .preview-content::-webkit-scrollbar-thumb:hover {
-            background: #45a049;
+            background: #848A91;
         }
 
         .mode-buttons {
@@ -462,7 +462,7 @@
         .process-button {
             padding: 20px 40px;
             font-size: 1.2em;
-            background-color: var(--gunmetal);
+            background-color: var(--bright-green);
             color: white;
             border: none;
             border-radius: 8px;
@@ -474,7 +474,17 @@
         .process-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            background-color: var(--hover-gunmetal);
+            background-color: var(--active-green);
+        }
+
+        .process-button.classify-mode {
+            background-color: var(--bright-blue);
+        }
+
+        .process-button.classify-mode:hover {
+            background-color: var(--active-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
 
         .template-box {
@@ -771,51 +781,12 @@
             opacity: 1;
         }
 
-        /* Process buttons - match their respective modes */
-        #process-button {
-            background-color: var(--bright-green);
-            padding: 20px 40px;
-            font-size: 1.2em;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            color: white;
-        }
-
-        #classify-button {
-            background-color: var(--bright-blue);
-            padding: 20px 40px;
-            font-size: 1.2em;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            color: white;
-            margin-left: 20px;
-        }
-
-        /* Hover states - even brighter */
-        #process-button:hover {
-            background-color: var(--active-green);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-
-        #classify-button:hover {
-            background-color: var(--active-blue);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-
         /* Active states - match mode buttons */
         .mode-button[onclick*="'summarize'"].active ~ .process-button-container #process-button {
             background-color: var(--active-green);
         }
 
-        .mode-button[onclick*="'classify'"].active ~ .process-button-container #classify-button {
+        .mode-button[onclick*="'classify'"].active ~ .process-button-container #process-button {
             background-color: var(--active-blue);
         }
 
@@ -829,6 +800,23 @@
         body[data-active-mode="classify"] .mode-button:not([onclick*="'classify'"]),
         body[data-active-mode="analyze"] .mode-button:not([onclick*="'analyze'"]) {
             opacity: 0.7;
+        }
+
+        /* Add scrollbar styling for log content */
+        #log-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #log-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        #log-content::-webkit-scrollbar-thumb {
+            background: #6B7177;
+        }
+
+        #log-content::-webkit-scrollbar-thumb:hover {
+            background: #848A91;
         }
     </style>
 </head>
@@ -1069,12 +1057,9 @@
 
         <!-- Process Button -->
         <div class="process-button-container">
-            <button id="process-button" class="process-button" onclick="processData('{% if session.get('mode') == 'classify' %}classify{% else %}summarize{% endif %}')">
+            <button id="process-button" class="process-button {% if session.get('mode') == 'classify' %}classify-mode{% endif %}" onclick="processData('{% if session.get('mode') == 'classify' %}classify{% else %}summarize{% endif %}')">
                 {% if session.get('mode') == 'classify' %}Classify Data{% else %}Summarize Data{% endif %}
             </button>
-            {% if session.get('mode') != 'classify' %}
-            <button id="classify-button" class="process-button" onclick="processData('classify')">Classify Data</button>
-            {% endif %}
         </div>
 
         <!-- Processing Log -->
@@ -1155,8 +1140,17 @@
                     document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
                     document.querySelector(`.mode-button[onclick="updateMode('${mode}')"]`).classList.add('active');
                     
-                    // Update body attribute for mode-specific styling
-                    updateModeStyles(mode);
+                    // Update process button class and text
+                    const processButton = document.getElementById('process-button');
+                    if (processButton) {
+                        if (mode === 'classify') {
+                            processButton.classList.add('classify-mode');
+                        } else {
+                            processButton.classList.remove('classify-mode');
+                        }
+                        processButton.textContent = mode === 'classify' ? 'Classify Data' : 'Summarize Data';
+                        processButton.onclick = function() { processData(mode); };
+                    }
                     
                     // Show/hide appropriate containers
                     var analysisContainer = document.getElementById('analysis-container');
@@ -1187,19 +1181,6 @@
                         if (templateSelect.options.length > 0) {
                             templateSelect.selectedIndex = 0;
                             updatePromptTemplate();
-                        }
-                        
-                        // Update process button text and visibility
-                        var processButton = document.getElementById('process-button');
-                        var classifyButton = document.getElementById('classify-button');
-                        
-                        if (processButton) {
-                            processButton.textContent = mode === 'classify' ? 'Classify Data' : 'Summarize Data';
-                            processButton.onclick = function() { processData(mode); };
-                        }
-                        
-                        if (classifyButton) {
-                            classifyButton.style.display = mode === 'classify' ? 'none' : 'inline-block';
                         }
                     }
                 }
@@ -1254,21 +1235,12 @@
 
         function processData(mode) {
             const processButton = document.getElementById('process-button');
-            const classifyButton = document.getElementById('classify-button');
             const logContent = document.getElementById('log-content');
             const customPrompt = document.getElementById('custom-prompt').value;
             const originalSummarizeText = processButton.textContent;
-            const originalClassifyText = classifyButton ? classifyButton.textContent : '';
             
             // Disable buttons during processing
             processButton.disabled = true;
-            if (classifyButton) {
-                classifyButton.disabled = true;
-            }
-            processButton.textContent = 'Processing...';
-            if (classifyButton) {
-                classifyButton.textContent = 'Processing...';
-            }
             
             // Clear previous log
             logContent.innerHTML = '';
@@ -1293,10 +1265,6 @@
                     eventSource.close();
                     processButton.disabled = false;
                     processButton.textContent = originalSummarizeText;
-                    if (classifyButton) {
-                        classifyButton.disabled = false;
-                        classifyButton.textContent = originalClassifyText;
-                    }
                     return;
                 }
                 
@@ -1304,10 +1272,6 @@
                     eventSource.close();
                     processButton.disabled = false;
                     processButton.textContent = originalSummarizeText;
-                    if (classifyButton) {
-                        classifyButton.disabled = false;
-                        classifyButton.textContent = originalClassifyText;
-                    }
                     
                     // Add completion message
                     const logEntry = document.createElement('div');
@@ -1332,9 +1296,6 @@
                     
                     // Update progress in button text
                     processButton.textContent = 'Processing... ' + progress + '%';
-                    if (classifyButton) {
-                        classifyButton.textContent = 'Processing... ' + progress + '%';
-                    }
                 }
             };
             
@@ -1348,10 +1309,6 @@
                 
                 processButton.disabled = false;
                 processButton.textContent = originalSummarizeText;
-                if (classifyButton) {
-                    classifyButton.disabled = false;
-                    classifyButton.textContent = originalClassifyText;
-                }
             };
         }
 
