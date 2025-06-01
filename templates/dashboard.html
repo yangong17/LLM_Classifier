@@ -1021,6 +1021,17 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
+                    // If switching from analyze mode to another mode, do a full page reload
+                    // to ensure all server-side data is properly loaded
+                    const currentMode = document.querySelector('.mode-button.active').textContent.toLowerCase().includes('analysis') ? 'analyze' : 
+                                      document.querySelector('.mode-button.active').textContent.toLowerCase().includes('classify') ? 'classify' : 'summarize';
+                    
+                    if (currentMode === 'analyze' && mode !== 'analyze') {
+                        location.reload();
+                        return;
+                    }
+                    
+                    // For other mode switches, update UI without reload
                     // Update mode button styling
                     document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
                     document.querySelector(`.mode-button[onclick="updateMode('${mode}')"]`).classList.add('active');
@@ -1030,11 +1041,11 @@
                     var regularContainer = document.getElementById('regular-container');
                     
                     if (mode === 'analyze') {
-                        analysisContainer.classList.add('active');
-                        regularContainer.classList.add('d-none');
+                        analysisContainer.style.display = 'block';
+                        regularContainer.style.display = 'none';
                     } else {
-                        analysisContainer.classList.remove('active');
-                        regularContainer.classList.remove('d-none');
+                        analysisContainer.style.display = 'none';
+                        regularContainer.style.display = 'block';
                         
                         // Update template select options based on mode
                         var templateSelect = document.getElementById('template-select');
@@ -1055,11 +1066,18 @@
                             templateSelect.selectedIndex = 0;
                             updatePromptTemplate();
                         }
+                        
+                        // Update process button text based on mode
+                        var processButton = document.getElementById('process-button');
+                        if (processButton) {
+                            processButton.textContent = mode === 'classify' ? 'Classify Data' : 'Summarize Data';
+                        }
                     }
                 }
             })
             .catch(function(error) {
                 console.error('Error:', error);
+                alert('Failed to update mode. Please try again.');
             });
         }
 
