@@ -1065,6 +1065,18 @@
 
         function updateColumn() {
             const column = document.getElementById('column-select').value;
+            const select = document.getElementById('column-select');
+            
+            // Disable the select while processing
+            select.disabled = true;
+            
+            if (!column) {
+                console.error('No column selected');
+                alert('Please select a column first');
+                select.disabled = false;
+                return;
+            }
+            
             fetch('/update_column', {
                 method: 'POST',
                 headers: {
@@ -1072,11 +1084,24 @@
                 },
                 body: JSON.stringify({ column: column })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'success') {
+                    console.log('Column updated successfully:', data.message);
                     location.reload();
+                } else {
+                    throw new Error(data.message || 'Unknown error occurred');
                 }
+            })
+            .catch(error => {
+                console.error('Error updating column:', error);
+                alert('Failed to update column: ' + error.message);
+                select.disabled = false;
             });
         }
 

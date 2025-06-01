@@ -357,19 +357,23 @@ def index():
                             models=MODEL_PRICING,
                             sample_prompts=SAMPLE_PROMPTS)
     
+    # Load columns from CSV
+    try:
+        df = pd.read_csv(session['csv_path'])
+        columns = df.columns.tolist()
+        session['columns'] = columns  # Store columns in session
+    except Exception as e:
+        print(f"Error loading CSV: {str(e)}")
+        return f"Error loading CSV: {str(e)}"
+    
     # Step 2: Column Selection
     if 'selected_column' not in session:
-        try:
-            df = pd.read_csv(session['csv_path'])
-            columns = df.columns.tolist()
-            return render_template('dashboard.html',
-                                step='select_column',
-                                csv_uploaded=True,
-                                columns=columns,
-                                models=MODEL_PRICING,
-                                sample_prompts=SAMPLE_PROMPTS)
-        except Exception as e:
-            return f"Error loading CSV: {str(e)}"
+        return render_template('dashboard.html',
+                            step='select_column',
+                            csv_uploaded=True,
+                            columns=columns,
+                            models=MODEL_PRICING,
+                            sample_prompts=SAMPLE_PROMPTS)
     
     # Step 3: API Key (if needed) and Main Dashboard
     api_key_status = is_api_key_valid()
@@ -384,27 +388,17 @@ def index():
                             api_key=mask_api_key(os.getenv('OPENAI_API_KEY')),
                             model=os.getenv('MODEL', 'gpt-4.1'),
                             models=MODEL_PRICING,
-                            columns=session.get('columns', []),
+                            columns=columns,
                             selected_column=session.get('selected_column'))
     
     # Calculate stats if we have both file and column and not in analysis mode
     stats = None
     if 'csv_path' in session and 'selected_column' in session and session.get('mode') != 'analyze':
         try:
-            df = pd.read_csv(session['csv_path'])
             selected_model = session.get('model', 'gpt-4.1')
             stats = calculate_stats(df, session['selected_column'], selected_model)
         except Exception as e:
             print(f"Error calculating stats: {str(e)}")
-    
-    # Get all columns for analysis mode
-    columns = []
-    if session.get('mode') == 'analyze' and 'csv_path' in session:
-        try:
-            df = pd.read_csv(session['csv_path'])
-            columns = df.columns.tolist()
-        except Exception as e:
-            print(f"Error getting columns: {str(e)}")
     
     return render_template('dashboard.html',
                         step='dashboard',
@@ -445,11 +439,38 @@ def upload_file():
 
 @app.route('/update_column', methods=['POST'])
 def update_column():
-    data = request.get_json()
-    column = data.get('column')
-    if column:
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+            
+        column = data.get('column')
+        if not column:
+            return jsonify({'status': 'error', 'message': 'No column specified'}), 400
+            
+        # Validate that the column exists in the CSV
+        if 'csv_path' not in session:
+            return jsonify({'status': 'error', 'message': 'No CSV file loaded'}), 400
+            
+        # Get columns from session or load from CSV
+        columns = session.get('columns', [])
+        if not columns:
+            try:
+                df = pd.read_csv(session['csv_path'])
+                columns = df.columns.tolist()
+                session['columns'] = columns
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': f'Error reading CSV: {str(e)}'}), 500
+            
+        if column not in columns:
+            return jsonify({'status': 'error', 'message': f'Column "{column}" not found in CSV'}), 400
+            
         session['selected_column'] = column
-    return jsonify({'status': 'success'})
+        return jsonify({'status': 'success', 'message': f'Successfully updated column to {column}'})
+        
+    except Exception as e:
+        print(f"Error in update_column: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/update_api_key', methods=['POST'])
 def update_api_key():
