@@ -706,13 +706,11 @@ def process():
             out_path = os.path.join(OUTPUT_FOLDER, output_filename)
             df.to_csv(out_path, index=False)
             
-            # Send completion message with download path and additional info
+            # Send completion message with download path
             completion_data = {
                 'status': 'complete',
                 'file': f'/download/{output_filename}',
-                'mode': mode,
-                'output_path': out_path,  # Include the output path in response
-                'offer_classification': mode == 'summarize'  # Only offer classification after summarization
+                'mode': mode
             }
             
             yield f"data: {json.dumps(completion_data)}\n\n"
