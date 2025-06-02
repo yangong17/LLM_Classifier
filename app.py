@@ -8,6 +8,8 @@ import traceback
 from dotenv import load_dotenv
 from collections import OrderedDict
 import json
+from datetime import datetime, timedelta
+import requests
 
 # === Load Environment Variables ===
 load_dotenv()
@@ -200,6 +202,48 @@ UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'outputs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+def get_billing_info():
+    try:
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            return {"error": "No API key found"}
+
+        # Get current date for billing query
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=90)  # Get last 90 days
+        
+        # Format dates for API
+        start_date_str = start_date.strftime('%Y-%m-%d')
+        end_date_str = end_date.strftime('%Y-%m-%d')
+        
+        # Make request to usage endpoint instead
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        response = requests.get(
+            f"https://api.openai.com/v1/dashboard/billing/usage?start_date={start_date_str}&end_date={end_date_str}",
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            total_usage = data.get("total_usage", 0) / 100  # Convert from cents to dollars
+            return {
+                "total_balance": f"${total_usage:.2f}",
+                "status": "success"
+            }
+        else:
+            return {"error": f"API returned status code {response.status_code}"}
+            
+    except Exception as e:
+        print(f"Error fetching billing info: {str(e)}")
+        return {"error": str(e)}
+
+@app.route('/get_billing_info', methods=['GET'])
+def billing_info():
+    return jsonify(get_billing_info())
 
 def is_api_key_valid():
     api_key = os.getenv('OPENAI_API_KEY')

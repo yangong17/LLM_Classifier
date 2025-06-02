@@ -1,39 +1,217 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LLM Classifier Dashboard</title>
+    <title>CSVision</title>
+    <!-- Add Google Fonts - Inter is modern and highly readable -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --gunmetal: #6B7177;
-            --hover-gunmetal: #848A91;
-            
-            /* Main colors - bright but not oversaturated */
+            /* Colors */
+            --button-default: #c0c0c0;
+            --button-hover: #867e7e;
             --bright-green: #7AC7A3;
-            --bright-blue: #82B7E8;
-            --bright-orange: #FFA665;
-            
-            /* Active/Selected states - more saturated */
+            --bright-blue: #81abd5;
+            --bright-orange: #e7a2b1;
             --active-green: #4CAF8A;
-            --active-blue: #4A90E2;
-            --active-orange: #FF8533;
-            
-            /* Muted states for inactive buttons */
+            --active-blue: #5596d7;
+            --active-orange: #ea5f7d;
             --muted-green: #A8D5BE;
-            --muted-blue: #B3D1ED;
-            --muted-orange: #FFBF99;
-            
-            /* Hover states - slightly brighter than active */
+            --muted-blue: #81abd5;
+            --muted-orange: #e7a2b1;
             --hover-green: #90DFB8;
-            --hover-blue: #99CCFF;
-            --hover-orange: #FFB380;
+            --hover-blue: #5596d7;
+            --hover-orange: #ea5f7d;
+            
+            /* Neutral colors */
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --border-light: #e2e8f0;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+        }
+
+        * {
+            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
         }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
+            border-left: 1px solid var(--border-light);
+            border-right: 1px solid var(--border-light);
+            min-height: 100vh;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
         }
+
+        .app-title {
+            text-align: center;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 2.8em;
+            font-weight: 700;
+            margin: 40px 0;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+            background: linear-gradient(120deg, #2c3e50, #3498db);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative;
+        }
+
+        .app-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(90deg, #2c3e50, #3498db);
+            border-radius: 2px;
+        }
+
+        .container, .stats-container, .template-box, .log-container, .analysis-container {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .container:hover, .stats-container:hover, .template-box:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .steps {
+            display: flex;
+            justify-content: center;
+            margin: 40px 0;
+            gap: 30px;
+        }
+
+        .step {
+            padding: 12px 24px;
+            background: var(--button-default);
+            border-radius: 2px;
+            font-size: 0.95em;
+            font-weight: 500;
+            color: white;
+            position: relative;
+        }
+
+        .step::after {
+            content: '';
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 10px;
+            height: 10px;
+            border-top: 2px solid var(--border-light);
+            border-right: 2px solid var(--border-light);
+            transform: translateY(-50%) rotate(45deg);
+        }
+
+        .step:last-child::after {
+            display: none;
+        }
+
+        .mode-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 40px 0;
+            padding: 20px;
+            background: linear-gradient(to right, rgba(255,255,255,0.5), rgba(255,255,255,0.8), rgba(255,255,255,0.5));
+            border-radius: 16px;
+        }
+
+        .mode-button {
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: 500;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: white;
+            opacity: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mode-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(255,255,255,0.1), rgba(255,255,255,0));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .mode-button:hover::before {
+            opacity: 1;
+        }
+
+        .settings-top {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            padding: 24px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+
+        .settings-top label {
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        input, select, textarea {
+            font-family: 'Inter', sans-serif;
+            padding: 10px 12px;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            font-size: 0.95em;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--bright-blue);
+            box-shadow: 0 0 0 3px rgba(129, 171, 213, 0.2);
+        }
+
+        .preview-box {
+            background: var(--bg-secondary);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .preview-content {
+            background: var(--bg-primary);
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+
         .container {
             background: #f5f5f5;
             padding: 20px;
@@ -68,13 +246,13 @@
         .button {
             padding: 10px 20px;
             border: none;
-            border-radius: 4px;
+            border-radius: 2px;  /* More rectangular */
             cursor: pointer;
-            background-color: var(--gunmetal);
+            background-color: var(--button-default);
             color: white;
         }
         .button:hover {
-            background-color: var(--hover-gunmetal);
+            background-color: var(--button-hover);
         }
         select, input {
             padding: 8px;
@@ -97,6 +275,12 @@
             margin: 40px auto;
             max-width: 600px;
         }
+        .step-container button {
+            margin-top: 20px;  /* Add space above buttons */
+        }
+        .step-container select {
+            margin-bottom: 20px;  /* Add space below dropdown */
+        }
         .error-message {
             color: #d32f2f;
             margin: 10px 0;
@@ -110,17 +294,16 @@
         .step {
             padding: 10px 20px;
             margin: 0 10px;
-            background: var(--gunmetal);
-            border-radius: 20px;
+            background: var(--button-default);
+            border-radius: 2px;  /* More rectangular */
             font-size: 0.9em;
             color: white;
         }
         .step.active {
-            background: var(--gunmetal);
-            opacity: 1;
+            background: var(--button-hover);
         }
         .step.completed {
-            background: var(--gunmetal);
+            background: var(--button-default);
             opacity: 0.8;
         }
         .stats-container {
@@ -258,18 +441,18 @@
         .tab-button {
             padding: 8px 16px;
             border: none;
-            border-radius: 4px;
-            background: var(--gunmetal);
+            border-radius: 2px;  /* More rectangular */
+            background: var(--button-default);
             color: white;
             cursor: pointer;
         }
 
         .tab-button:hover {
-            background: var(--hover-gunmetal);
+            background: var(--button-hover);
         }
 
         .tab-button.active {
-            background: var(--gunmetal);
+            background: var(--button-hover);
         }
 
         .template-controls {
@@ -417,12 +600,12 @@
         }
 
         .preview-content::-webkit-scrollbar-thumb {
-            background: #6B7177;
+            background: var(--button-default);
             border-radius: 4px;
         }
 
         .preview-content::-webkit-scrollbar-thumb:hover {
-            background: #848A91;
+            background: var(--button-hover);
         }
 
         .mode-buttons {
@@ -441,16 +624,19 @@
             transition: all 0.3s ease;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             color: white;
-            opacity: 0.85; /* Slightly muted by default */
+            opacity: 1;
+            background-color: var(--button-default);
         }
 
         .mode-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            background-color: var(--button-hover);
         }
 
         .mode-button.active {
-            background-color: var(--gunmetal);
+            background-color: var(--button-hover);
+            opacity: 1;
         }
 
         .process-button-container {
@@ -462,7 +648,7 @@
         .process-button {
             padding: 20px 40px;
             font-size: 1.2em;
-            background-color: var(--bright-green);
+            background-color: var(--button-default);
             color: white;
             border: none;
             border-radius: 8px;
@@ -474,17 +660,15 @@
         .process-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            background-color: var(--active-green);
+            background-color: var(--button-hover);
         }
 
         .process-button.classify-mode {
-            background-color: var(--bright-blue);
+            background-color: #81abd5;
         }
 
         .process-button.classify-mode:hover {
-            background-color: var(--active-blue);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            background-color: #5596d7;
         }
 
         .template-box {
@@ -553,111 +737,141 @@
         .column-selection {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin: 20px 0;
+            gap: 30px;
+            margin: 30px 0;
         }
 
         .column-list {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 4px;
+            background: var(--bg-secondary);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             min-height: 200px;
         }
 
         .column-list h4 {
-            margin-top: 0;
-            color: #2c3e50;
+            margin: 0 0 20px 0;
+            color: var(--text-primary);
+            font-size: 1.1em;
+            font-weight: 600;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border-light);
         }
 
         .column-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 8px;
-            margin: 5px 0;
-            background: white;
-            border-radius: 4px;
+            gap: 12px;
+            padding: 12px;
+            margin: 8px 0;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: all 0.2s ease;
+            color: var(--text-secondary);
         }
 
         .column-item:hover {
-            background: #e3f2fd;
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
         }
 
         .column-item.selected {
-            background: #bbdefb;
+            background: #e8f4ff;
+            border-color: var(--bright-blue);
+            color: var(--text-primary);
+        }
+
+        .column-item input[type="checkbox"],
+        .column-item input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            cursor: pointer;
+            accent-color: var(--bright-blue);
+        }
+
+        .column-item label {
+            flex: 1;
+            font-size: 0.95em;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #analysis-container {
+            padding: 30px;
+            margin: 40px 0;
+        }
+
+        #analysis-container h2 {
+            color: var(--text-primary);
+            font-size: 1.5em;
+            font-weight: 600;
+            margin: 0 0 30px 0;
+            text-align: center;
         }
 
         .analysis-button {
             display: block;
-            margin: 30px auto;
-            padding: 15px 40px;
+            margin: 40px auto 20px;
+            padding: 14px 40px;
             font-size: 1.1em;
-            background-color: var(--gunmetal);
+            font-weight: 500;
+            background-color: var(--bright-blue);
             color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
-        .analysis-button:hover {
-            background-color: var(--hover-gunmetal);
+        .analysis-button:hover:not(:disabled) {
+            background-color: var(--active-blue);
             transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
 
         .analysis-button:disabled {
-            background-color: #cccccc;
+            background-color: #e2e8f0;
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
         }
 
-        .analysis-results {
-            display: none;
-            margin-top: 30px;
+        /* Add a subtle scroll effect for many variables */
+        #predictor-columns,
+        #outcome-columns {
+            max-height: none;
+            overflow-y: visible;
         }
 
-        .analysis-results.active {
-            display: block;
+        /* Scrollbar styling */
+        #predictor-columns::-webkit-scrollbar,
+        #outcome-columns::-webkit-scrollbar {
+            width: 8px;
         }
 
-        .correlation-table {
-            width: 100%;
-            margin: 20px 0;
-            border-collapse: collapse;
-            background: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        #predictor-columns::-webkit-scrollbar-track,
+        #outcome-columns::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+            border-radius: 4px;
         }
 
-        .correlation-table th,
-        .correlation-table td {
-            padding: 12px;
-            text-align: center;
-            border: 1px solid #e9ecef;
+        #predictor-columns::-webkit-scrollbar-thumb,
+        #outcome-columns::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
         }
 
-        .correlation-table th {
-            background: #f8f9fa;
-            font-weight: bold;
-        }
-
-        .correlation-value {
-            font-family: monospace;
-        }
-
-        .distribution-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);  /* Changed from auto-fit to 2 columns */
-            gap: 20px;
-            margin: 20px 0;
-        }
-
-        .distribution-plot {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        #predictor-columns::-webkit-scrollbar-thumb:hover,
+        #outcome-columns::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
 
         .loading-spinner {
@@ -757,14 +971,14 @@
 
         /* Classification mode */
         .mode-button[onclick*="'classify'"] {
-            background-color: var(--muted-blue);
+            background-color: #81abd5;
         }
         .mode-button[onclick*="'classify'"]:hover {
-            background-color: var(--hover-blue);
+            background-color: #5596d7;
             opacity: 1;
         }
         .mode-button[onclick*="'classify'"].active {
-            background-color: var(--active-blue);
+            background-color: #5596d7;
             opacity: 1;
         }
 
@@ -781,13 +995,25 @@
             opacity: 1;
         }
 
-        /* Active states - match mode buttons */
+        /* Process buttons should match their mode colors */
         .mode-button[onclick*="'summarize'"].active ~ .process-button-container #process-button {
             background-color: var(--active-green);
         }
-
         .mode-button[onclick*="'classify'"].active ~ .process-button-container #process-button {
-            background-color: var(--active-blue);
+            background-color: #5596d7;
+        }
+
+        .process-button {
+            background-color: var(--active-green);
+        }
+        .process-button:hover {
+            background-color: var(--hover-green);
+        }
+        .process-button.classify-mode {
+            background-color: #81abd5;
+        }
+        .process-button.classify-mode:hover {
+            background-color: #5596d7;
         }
 
         /* Add transition for smooth color changes */
@@ -812,16 +1038,38 @@
         }
 
         #log-content::-webkit-scrollbar-thumb {
-            background: #6B7177;
+            background: var(--button-default);
         }
 
         #log-content::-webkit-scrollbar-thumb:hover {
-            background: #848A91;
+            background: var(--button-hover);
+        }
+
+        /* Analysis Results Sections */
+        .analysis-section {
+            display: none;  /* Hide by default */
+            margin-top: 40px;
+            padding: 24px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .analysis-section h3 {
+            color: var(--text-primary);
+            font-size: 1.3em;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+        }
+
+        /* Show sections when results are active */
+        .analysis-results.active .analysis-section {
+            display: block;
         }
     </style>
 </head>
 <body>
-    <h1>LLM Classifier Dashboard</h1>
+    <h1 class="app-title">CSVision</h1>
 
     <!-- Progress Steps -->
     <div class="steps">
@@ -947,14 +1195,20 @@
         
         <!-- Analysis Results -->
         <div id="analysis-results" class="analysis-results">
-            <h3>Pearson Correlation with Outcome</h3>
-            <div id="pearson-correlation" class="pearson-correlation"></div>
+            <div class="analysis-section">
+                <h3>Pearson Correlation with Outcome</h3>
+                <div id="pearson-correlation" class="pearson-correlation"></div>
+            </div>
             
-            <h3>Full Correlation Matrix</h3>
-            <div id="correlation-table"></div>
+            <div class="analysis-section">
+                <h3>Full Correlation Matrix</h3>
+                <div id="correlation-table"></div>
+            </div>
             
-            <h3>Distribution Analysis</h3>
-            <div id="distribution-grid" class="distribution-grid"></div>
+            <div class="analysis-section">
+                <h3>Distribution Analysis</h3>
+                <div id="distribution-grid" class="distribution-grid"></div>
+            </div>
         </div>
     </div>
 
