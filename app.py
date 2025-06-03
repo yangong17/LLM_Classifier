@@ -16,32 +16,20 @@ load_dotenv()
 
 # === Constants ===
 MODEL_PRICING = {
-    'gpt-4.1': {
-        'display_name': 'GPT-4.1 ($2.00/$8.00 per 1M tokens)',
-        'input': 2.00,  # Price per 1M tokens
-        'cached_input': 0.50,
-        'output': 8.00
+    'gpt-4': {
+        'display_name': 'GPT-4 ($0.03/$0.06 per 1K tokens)',
+        'input': 30.00,  # Price per 1M tokens
+        'cached_input': 7.50,
+        'output': 60.00
     },
-    'gpt-4.1-mini': {
-        'display_name': 'GPT-4.1 Mini ($0.40/$1.60 per 1M tokens)',
-        'input': 0.40,
-        'cached_input': 0.10,
-        'output': 1.60
-    },
-    'gpt-4.1-nano': {
-        'display_name': 'GPT-4.1 Nano ($0.10/$0.40 per 1M tokens)',
-        'input': 0.10,
-        'cached_input': 0.025,
-        'output': 0.40
-    },
-    'gpt-4o': {
-        'display_name': 'GPT-4O ($2.50/$10.00 per 1M tokens)',
-        'input': 2.50,
-        'cached_input': 1.25,
-        'output': 10.00
+    'gpt-4-turbo-preview': {
+        'display_name': 'GPT-4 Turbo ($0.01/$0.03 per 1K tokens)',
+        'input': 10.00,
+        'cached_input': 2.50,
+        'output': 30.00
     },
     'gpt-3.5-turbo': {
-        'display_name': 'GPT-3.5 Turbo ($0.50/$1.50 per 1M tokens)',
+        'display_name': 'GPT-3.5 Turbo ($0.0005/$0.0015 per 1K tokens)',
         'input': 0.50,
         'cached_input': 0.10,
         'output': 1.50
@@ -435,7 +423,7 @@ def index():
                             error_message="❌ Connection error. Please check your internet connection and try again.",
                             csv_uploaded=True,
                             api_key=mask_api_key(os.getenv('OPENAI_API_KEY')),
-                            model=os.getenv('MODEL', 'gpt-4.1'),
+                            model=os.getenv('MODEL', 'gpt-4'),
                             models=MODEL_PRICING,
                             columns=columns,
                             selected_column=session.get('selected_column'))
@@ -444,7 +432,7 @@ def index():
     stats = None
     if 'csv_path' in session and 'selected_column' in session and session.get('mode') != 'analyze':
         try:
-            selected_model = session.get('model', 'gpt-4.1')
+            selected_model = session.get('model', 'gpt-4')
             stats = calculate_stats(df, session['selected_column'], selected_model)
         except Exception as e:
             print(f"Error calculating stats: {str(e)}")
@@ -454,7 +442,7 @@ def index():
                         needs_api_key=not api_key_status,
                         csv_uploaded=True,
                         api_key=mask_api_key(os.getenv('OPENAI_API_KEY')),
-                        model=os.getenv('MODEL', 'gpt-4.1'),
+                        model=os.getenv('MODEL', 'gpt-4'),
                         models=MODEL_PRICING,
                         columns=columns,
                         selected_column=session.get('selected_column'),
@@ -565,7 +553,7 @@ def update_api_key():
             # Save the key
             if not os.path.exists('.env'):
                 with open('.env', 'w', encoding='utf-8') as f:
-                    f.write(f'OPENAI_API_KEY={api_key}\nMODEL=gpt-4.1')
+                    f.write(f'OPENAI_API_KEY={api_key}\nMODEL=gpt-4')
             else:
                 with open('.env', 'r', encoding='utf-8') as f:
                     env_lines = f.readlines()
@@ -665,7 +653,7 @@ def update_cost_stats():
     try:
         df = pd.read_csv(session['csv_path'])
         column = session['selected_column']
-        selected_model = session.get('model', 'gpt-4.1')
+        selected_model = session.get('model', 'gpt-4')
         
         stats = calculate_stats(df, column, selected_model, template)
         return jsonify({
@@ -698,7 +686,7 @@ def process():
             return "No prompt template provided", 400
         
         api_key = os.getenv('OPENAI_API_KEY')
-        model = os.getenv('MODEL', 'gpt-4.1')
+        model = os.getenv('MODEL', 'gpt-4')
         
         print(f"Initializing OpenAI client with model: {model}")
         print(f"API key present: {'Yes' if api_key else 'No'}")
