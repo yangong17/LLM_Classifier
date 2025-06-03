@@ -259,9 +259,15 @@ def is_api_key_valid():
         return False
     try:
         print(f"Testing OpenAI connection with API key: {mask_api_key(api_key)}")
-        openai.api_key = api_key
-        client = openai.OpenAI(api_key=api_key)
-        client.models.list()  # Test the connection
+        client = openai.OpenAI(
+            api_key=api_key,
+            # Remove any proxy settings that might cause issues
+            base_url="https://api.openai.com/v1"
+        )
+        # Test the connection with a simple models list call
+        models = client.models.list()
+        if not models.data:
+            raise Exception("No models found")
         print("OpenAI connection test successful")
         return True
     except openai.APIConnectionError as e:
@@ -553,11 +559,17 @@ def update_api_key():
                 'message': 'API key contains invalid characters. Please ensure you\'ve copied it correctly from OpenAI.'
             }), 400
         
-        # Test the API key
-        openai.api_key = api_key
-        client = openai.OpenAI(api_key=api_key)
+        # Test the API key with the new OpenAI client
+        client = openai.OpenAI(
+            api_key=api_key,
+            base_url="https://api.openai.com/v1"
+        )
+        
         try:
-            client.models.list()
+            # Test with a simple models list call
+            models = client.models.list()
+            if not models.data:
+                raise Exception("No models found")
         except openai.AuthenticationError:
             return jsonify({
                 'status': 'error',
@@ -716,8 +728,11 @@ def process():
             yield f"data: {json.dumps({'status': 'info', 'message': f'Testing OpenAI connection with API key: {mask_api_key(api_key)}'})}\n\n"
             
             try:
-                client = openai.OpenAI(api_key=api_key)
-                client.models.list()
+                client = openai.OpenAI(
+                    api_key=api_key,
+                    base_url="https://api.openai.com/v1"
+                )
+                models = client.models.list()
                 yield f"data: {json.dumps({'status': 'success', 'message': 'OpenAI connection test successful'})}\n\n"
             except Exception as e:
                 error_msg = f"OpenAI connection test failed: {str(e)} (Type: {type(e).__name__})"
