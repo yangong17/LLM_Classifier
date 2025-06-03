@@ -248,17 +248,22 @@ def billing_info():
 def is_api_key_valid():
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key or not api_key.strip():
+        print(f"No API key found in environment")
         return False
     try:
+        print(f"Testing OpenAI connection with API key: {mask_api_key(api_key)}")
         openai.api_key = api_key
         client = openai.OpenAI(api_key=api_key)
         client.models.list()  # Test the connection
+        print("OpenAI connection test successful")
         return True
     except openai.APIConnectionError as e:
-        print(f"Connection Error: {str(e)}")
+        print(f"Connection Error details: {str(e)}")
+        print(f"Error type: {type(e)}")
         return "connection_error"
     except Exception as e:
-        print(f"API Error: {str(e)}")
+        print(f"API Error details: {str(e)}")
+        print(f"Error type: {type(e)}")
         return False
 
 def mask_api_key(api_key):
@@ -692,11 +697,22 @@ def process():
         if not prompt_template:
             return "No prompt template provided", 400
         
-        openai.api_key = os.getenv('OPENAI_API_KEY')
+        api_key = os.getenv('OPENAI_API_KEY')
         model = os.getenv('MODEL', 'gpt-4.1')
         
+        print(f"Initializing OpenAI client with model: {model}")
+        print(f"API key present: {'Yes' if api_key else 'No'}")
+        
         # Create a client using the new OpenAI format
-        client = openai.OpenAI(api_key=openai.api_key)
+        try:
+            client = openai.OpenAI(api_key=api_key)
+            # Test the connection
+            client.models.list()
+            print("OpenAI client initialized successfully")
+        except Exception as e:
+            print(f"Error initializing OpenAI client: {str(e)}")
+            print(f"Error type: {type(e)}")
+            return f"Error initializing OpenAI client: {str(e)}", 500
 
         results = []
         parsed_results = []  # For classification mode
