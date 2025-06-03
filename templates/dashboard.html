@@ -1248,6 +1248,79 @@
         .instruction-section a:hover {
             text-decoration: underline;
         }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            color: white;
+            margin-top: 20px;
+            font-size: 1.2em;
+            text-align: center;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .process-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .error {
+            color: #ff5252;
+            margin: 5px 0;
+        }
+
+        .success {
+            color: #4CAF50;
+            margin: 5px 0;
+        }
+
+        .download {
+            margin: 10px 0;
+        }
+
+        .download a {
+            color: #3498db;
+            text-decoration: none;
+        }
+
+        .download a:hover {
+            text-decoration: underline;
+        }
+
+        .result {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -1591,6 +1664,13 @@
     </div>
     {% endif %}
 
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <div class="loading-text">Processing your data...</div>
+        </div>
+    </div>
+
     <script>
         var TEMPLATES = {{ sample_prompts|tojson|safe }};
 
@@ -1755,81 +1835,54 @@
         }
 
         function processData(mode) {
-            const processButton = document.getElementById('process-button');
+            // Disable the process button
+            document.getElementById('process-button').disabled = true;
+            
+            const prompt = document.getElementById('custom-prompt').value;
             const logContent = document.getElementById('log-content');
-            const customPrompt = document.getElementById('custom-prompt').value;
-            const originalSummarizeText = processButton.textContent;
             
-            // Disable buttons during processing
-            processButton.disabled = true;
-            
-            // Clear previous log
-            logContent.innerHTML = '';
+            // Show initialization message in the log
+            logContent.innerHTML = '<div class="result">Initializing processing...</div>';
             
             // Create EventSource for server-sent events
-            const params = new URLSearchParams({
-                custom_prompt: customPrompt,
-                mode: mode
-            });
-            
-            const eventSource = new EventSource(`/process?${params.toString()}`);
+            const eventSource = new EventSource(`/process?custom_prompt=${encodeURIComponent(prompt)}&mode=${mode}`);
             
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);
                 
                 if (data.error) {
-                    const logEntry = document.createElement('div');
-                    logEntry.innerHTML = '<span style="color: #ff5252;">❌</span> Error: ' + data.error;
-                    logContent.appendChild(logEntry);
-                    logContent.scrollTop = logContent.scrollHeight;
-                    
+                    logContent.innerHTML += `<div class="error">❌ Error: ${data.error}</div>`;
+                    document.getElementById('process-button').disabled = false;
                     eventSource.close();
-                    processButton.disabled = false;
-                    processButton.textContent = originalSummarizeText;
                     return;
                 }
                 
                 if (data.status === 'complete') {
+                    // Processing complete
+                    logContent.innerHTML += '<div class="success">✅ Processing complete!</div>';
+                    if (data.file) {
+                        logContent.innerHTML += `<div class="download"><a href="${data.file}" download>Download Results</a></div>`;
+                    }
+                    document.getElementById('process-button').disabled = false;
                     eventSource.close();
-                    processButton.disabled = false;
-                    processButton.textContent = originalSummarizeText;
-                    
-                    // Add completion message
-                    const logEntry = document.createElement('div');
-                    logEntry.innerHTML = '<span style="color: #4CAF50;">✓</span> Processing complete!';
-                    logContent.appendChild(logEntry);
-                    
-                    // Automatically trigger download
-                    const downloadIframe = document.createElement('iframe');
-                    downloadIframe.style.display = 'none';
-                    downloadIframe.src = data.file;
-                    document.body.appendChild(downloadIframe);
-                    setTimeout(() => {
-                        document.body.removeChild(downloadIframe);
-                    }, 2000);
                 } else if (data.status === 'processing') {
-                    // Update progress in the original style
-                    const logEntry = document.createElement('div');
+                    // Update progress
                     const progress = Math.round((data.current / data.total) * 100);
-                    logEntry.innerHTML = '<span style="color: #4CAF50;">✓</span> Processed ' + data.current + ' of ' + data.total + ': ' + data.result;
-                    logContent.appendChild(logEntry);
-                    logContent.scrollTop = logContent.scrollHeight;
-                    
-                    // Update progress in button text
-                    processButton.textContent = 'Processing... ' + progress + '%';
+                    logContent.innerHTML = `
+                        <div>Processing: ${data.current} of ${data.total} (${progress}%)</div>
+                        <div class="result">Last result: ${data.result}</div>
+                    `;
                 }
+                
+                // Auto-scroll to bottom of log
+                logContent.scrollTop = logContent.scrollHeight;
             };
             
             eventSource.onerror = function(error) {
                 console.error('EventSource error:', error);
+                logContent.innerHTML += '<div class="error">❌ Connection error. Please try again.</div>';
+                document.getElementById('process-button').disabled = false;
                 eventSource.close();
-                
-                const logEntry = document.createElement('div');
-                logEntry.innerHTML = '<span style="color: #ff5252;">❌</span> Connection error. Please try again.';
-                logContent.appendChild(logEntry);
-                
-                processButton.disabled = false;
-                processButton.textContent = originalSummarizeText;
             };
         }
 

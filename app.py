@@ -10,9 +10,14 @@ from collections import OrderedDict
 import json
 from datetime import datetime, timedelta
 import requests
+import logging
 
 # === Load Environment Variables ===
 load_dotenv()
+
+# Add logging configuration
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # === Constants ===
 MODEL_PRICING = {
@@ -27,6 +32,12 @@ MODEL_PRICING = {
         'input': 10.00,
         'cached_input': 2.50,
         'output': 30.00
+    },
+    'gpt-4-1106-preview': {
+        'display_name': 'GPT-4.1-nano ($0.01/$0.02 per 1K tokens)',
+        'input': 10.00,
+        'cached_input': 2.50,
+        'output': 20.00
     },
     'gpt-3.5-turbo': {
         'display_name': 'GPT-3.5 Turbo ($0.0005/$0.0015 per 1K tokens)',
@@ -186,10 +197,16 @@ Text:
 # === Flask Setup ===
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Needed for session management, not authentication
-UPLOAD_FOLDER = 'uploads'
-OUTPUT_FOLDER = 'outputs'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+UPLOAD_FOLDER = '/tmp/uploads'  # Change to /tmp for Cloud Run
+OUTPUT_FOLDER = '/tmp/outputs'  # Change to /tmp for Cloud Run
+
+# Ensure directories exist and are writable
+try:
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    logger.info(f"Created directories: {UPLOAD_FOLDER} and {OUTPUT_FOLDER}")
+except Exception as e:
+    logger.error(f"Error creating directories: {str(e)}")
 
 def get_billing_info():
     try:
@@ -235,23 +252,24 @@ def billing_info():
 
 def is_api_key_valid():
     api_key = os.getenv('OPENAI_API_KEY')
+    logger.info(f"Checking API key validity. Key present: {bool(api_key)}")
     if not api_key or not api_key.strip():
-        print(f"No API key found in environment")
+        logger.error("No API key found in environment")
         return False
     try:
-        print(f"Testing OpenAI connection with API key: {mask_api_key(api_key)}")
-        openai.api_key = api_key
+        logger.info(f"Testing OpenAI connection with API key: {mask_api_key(api_key)}")
         client = openai.OpenAI(api_key=api_key)
-        client.models.list()  # Test the connection
-        print("OpenAI connection test successful")
+        logger.info("Created OpenAI client, attempting to list models...")
+        client.models.list()
+        logger.info("OpenAI connection test successful")
         return True
     except openai.APIConnectionError as e:
-        print(f"Connection Error details: {str(e)}")
-        print(f"Error type: {type(e)}")
+        logger.error(f"Connection Error details: {str(e)}")
+        logger.error(f"Error type: {type(e)}")
         return "connection_error"
     except Exception as e:
-        print(f"API Error details: {str(e)}")
-        print(f"Error type: {type(e)}")
+        logger.error(f"API Error details: {str(e)}")
+        logger.error(f"Error type: {type(e)}")
         return False
 
 def mask_api_key(api_key):
@@ -455,23 +473,32 @@ def index():
 
 @app.route('/upload_file', methods=['POST'])
 def upload_file():
+    logger.info("Starting file upload")
     if 'csv_file' not in request.files:
+        logger.error("No file part in request")
         return redirect(url_for('index'))
     
     file = request.files['csv_file']
     if file:
-        filename = secure_filename(file.filename)
-        path = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(path)
-        session['csv_path'] = path
-        
-        # Load columns
         try:
-            df = pd.read_csv(path)
-            session['columns'] = df.columns.tolist()
+            filename = secure_filename(file.filename)
+            path = os.path.join(UPLOAD_FOLDER, filename)
+            logger.info(f"Saving file to: {path}")
+            file.save(path)
+            session['csv_path'] = path
+            
+            # Load columns
+            try:
+                df = pd.read_csv(path)
+                session['columns'] = df.columns.tolist()
+                logger.info(f"Successfully loaded CSV with columns: {df.columns.tolist()}")
+            except Exception as e:
+                logger.error(f"Error loading CSV: {str(e)}")
+                return f"Error loading CSV: {str(e)}"
         except Exception as e:
-            return f"Error loading CSV: {str(e)}"
-        
+            logger.error(f"Error saving file: {str(e)}")
+            return f"Error saving file: {str(e)}"
+    
     return redirect(url_for('index'))
 
 @app.route('/update_column', methods=['POST'])
@@ -529,9 +556,8 @@ def update_api_key():
             }), 400
         
         # Test the API key
-        openai.api_key = api_key
-        client = openai.OpenAI(api_key=api_key)
         try:
+            client = openai.OpenAI(api_key=api_key)
             client.models.list()
         except openai.AuthenticationError:
             return jsonify({
@@ -668,13 +694,17 @@ def update_cost_stats():
 
 @app.route('/process', methods=['GET', 'POST'])
 def process():
+    logger.info("Starting process route")
     if not is_api_key_valid():
+        logger.error("API key validation failed")
         return "Please set your OpenAI API key first", 400
         
     try:
+        logger.info("Loading CSV file")
         df = pd.read_csv(session['csv_path'])
         col = session['selected_column']
-        mode = request.args.get('mode', 'summarize')  # Get mode from request parameters
+        mode = request.args.get('mode', 'summarize')
+        logger.info(f"Processing mode: {mode}")
         
         # Handle both GET and POST methods
         if request.method == 'POST':
@@ -683,24 +713,34 @@ def process():
             prompt_template = request.args.get('custom_prompt')
         
         if not prompt_template:
+            logger.error("No prompt template provided")
             return "No prompt template provided", 400
         
         api_key = os.getenv('OPENAI_API_KEY')
-        model = os.getenv('MODEL', 'gpt-4')
+        model = os.getenv('MODEL', 'gpt-3.5-turbo')
         
-        print(f"Initializing OpenAI client with model: {model}")
-        print(f"API key present: {'Yes' if api_key else 'No'}")
+        logger.info(f"Initializing OpenAI client with model: {model}")
+        logger.info(f"API key present: {'Yes' if api_key else 'No'}")
         
         # Create a client using the new OpenAI format
         try:
             client = openai.OpenAI(api_key=api_key)
             # Test the connection
             client.models.list()
-            print("OpenAI client initialized successfully")
+            logger.info("OpenAI client initialized successfully")
         except Exception as e:
-            print(f"Error initializing OpenAI client: {str(e)}")
-            print(f"Error type: {type(e)}")
+            logger.error(f"Error initializing OpenAI client: {str(e)}")
+            logger.error(f"Error type: {type(e)}")
             return f"Error initializing OpenAI client: {str(e)}", 500
+
+        # Add environment variable logging
+        logger.info("Current environment variables:")
+        for key in ['OPENAI_API_KEY', 'MODEL', 'PORT', 'FLASK_APP', 'FLASK_ENV']:
+            value = os.getenv(key)
+            if key == 'OPENAI_API_KEY' and value:
+                logger.info(f"{key}: {mask_api_key(value)}")
+            else:
+                logger.info(f"{key}: {value}")
 
         results = []
         parsed_results = []  # For classification mode

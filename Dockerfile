@@ -10,18 +10,22 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements first for better caching
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Install specific version of openai first, then other requirements
+RUN pip install --no-cache-dir openai==1.3.0 && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p uploads outputs
+RUN mkdir -p /tmp/uploads /tmp/outputs
 
 # Set environment variables
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
 
 # Expose port
 EXPOSE 8080
