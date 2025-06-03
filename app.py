@@ -523,23 +523,49 @@ def update_api_key():
     
     if not api_key:
         return jsonify({'status': 'error', 'message': 'No API key provided'}), 400
-        
+
     try:
+        # Sanitize the API key - remove any non-ASCII characters and whitespace
+        api_key = ''.join(char for char in api_key if 32 <= ord(char) <= 126)
+        api_key = api_key.strip()
+
+        if not api_key:
+            return jsonify({
+                'status': 'error',
+                'message': 'API key contains invalid characters. Please ensure you\'ve copied it correctly from OpenAI.'
+            }), 400
+        
         # Test the API key
         openai.api_key = api_key
         client = openai.OpenAI(api_key=api_key)
-        client.models.list()
+        try:
+            client.models.list()
+        except openai.AuthenticationError:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid API key. Please check your API key and try again.'
+            }), 400
+        except openai.APIConnectionError as e:
+            return jsonify({
+                'status': 'error',
+                'message': 'Could not connect to OpenAI. Please check your internet connection.'
+            }), 400
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error validating API key: {str(e)}'
+            }), 400
         
         try:
             # Save the key
             if not os.path.exists('.env'):
-                with open('.env', 'w') as f:
+                with open('.env', 'w', encoding='utf-8') as f:
                     f.write(f'OPENAI_API_KEY={api_key}\nMODEL=gpt-4.1')
             else:
-                with open('.env', 'r') as f:
+                with open('.env', 'r', encoding='utf-8') as f:
                     env_lines = f.readlines()
                 
-                with open('.env', 'w') as f:
+                with open('.env', 'w', encoding='utf-8') as f:
                     key_written = False
                     for line in env_lines:
                         if line.startswith('OPENAI_API_KEY='):
@@ -568,7 +594,7 @@ def update_api_key():
     except Exception as e:
         return jsonify({
             'status': 'error',
-            'message': f'Invalid API key: {str(e)}'
+            'message': f'Error processing API key: {str(e)}'
         }), 400
 
 @app.route('/update_model', methods=['POST'])
@@ -805,6 +831,7 @@ def run_analysis():
         
         # Calculate distributions for predictor variables
         distributions = {}
+        scatter_data = {}
         for var in predictors:
             values = df[var].dropna().tolist()
             distributions[var] = {
@@ -814,11 +841,19 @@ def run_analysis():
                 'min': float(np.min(values)),
                 'max': float(np.max(values))
             }
+            
+            # Get data for scatter plots (only where both x and y are not null)
+            mask = df[[var, outcome]].notna().all(axis=1)
+            scatter_data[var] = {
+                'x': df[var][mask].tolist(),
+                'y': df[outcome][mask].tolist()
+            }
         
         return jsonify({
             'status': 'success',
             'correlations': correlations,
-            'distributions': distributions
+            'distributions': distributions,
+            'scatter_data': scatter_data
         })
         
     except Exception as e:

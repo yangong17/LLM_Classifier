@@ -50,12 +50,25 @@
             line-height: 1.5;
         }
 
-        .app-title {
+        .app-header {
             text-align: center;
+            margin: 40px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 25px;  /* Increased gap slightly */
+        }
+
+        .app-logo {
+            width: 65px;  /* Increased from 50px */
+            height: 65px;  /* Increased from 50px */
+            object-fit: contain;
+        }
+
+        .app-title {
             font-family: 'Montserrat', sans-serif;
             font-size: 2.8em;
             font-weight: 700;
-            margin: 40px 0;
             color: var(--text-primary);
             letter-spacing: -0.5px;
             text-transform: uppercase;
@@ -63,6 +76,7 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             position: relative;
+            margin: 0;
         }
 
         .app-title::after {
@@ -71,7 +85,7 @@
             bottom: -10px;
             left: 50%;
             transform: translateX(-50%);
-            width: 60px;
+            width: 120px;  /* Increased from 60px */
             height: 4px;
             background: linear-gradient(90deg, #2c3e50, #3498db);
             border-radius: 2px;
@@ -1066,10 +1080,246 @@
         .analysis-results.active .analysis-section {
             display: block;
         }
+
+        .scatter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .scatter-plot {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .scatter-controls {
+            margin-bottom: 15px;
+        }
+
+        .loess-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .loess-toggle input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        /* Add to existing styles */
+        .help-button {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9em;
+            font-weight: 500;
+            margin-left: auto;
+        }
+
+        .help-button:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: white;
+            margin: 40px auto;
+            padding: 0;
+            width: 90%;
+            max-width: 800px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1.5em;
+        }
+
+        .close-modal {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0 8px;
+        }
+
+        .close-modal:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .instruction-section {
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .instruction-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .instruction-section h3 {
+            color: var(--text-primary);
+            margin: 0 0 16px 0;
+            font-size: 1.2em;
+        }
+
+        .instruction-section p {
+            margin: 8px 0;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .instruction-section ul {
+            margin: 8px 0;
+            padding-left: 24px;
+            color: var(--text-secondary);
+        }
+
+        .instruction-section li {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+
+        .instruction-section code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .instruction-section a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .instruction-section a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
-    <h1 class="app-title">CSVision</h1>
+    <div class="app-header">
+        <img src="{{ url_for('static', filename='images/csvision-logo.png') }}" alt="CSVision Logo" class="app-logo">
+        <h1 class="app-title">CSVision</h1>
+        <button onclick="showInstructions()" class="help-button">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12" y2="17"></line>
+            </svg>
+            Instructions
+        </button>
+    </div>
+
+    <!-- Instructions Modal -->
+    <div id="instructionsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📚 CSVision Instructions</h2>
+                <span class="close-modal" onclick="hideInstructions()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <section class="instruction-section">
+                    <h3>🚀 Getting Started</h3>
+                    <ul>
+                        <li>Upload a CSV file containing your text data</li>
+                        <li>Select the column you want to analyze</li>
+                        <li>Choose between Summarization, Classification, or Analysis mode</li>
+                    </ul>
+                </section>
+
+                <section class="instruction-section">
+                    <h3>📊 Sample Data</h3>
+                    <p>You can find sample CSV files in the <a href="https://github.com/yangong17/STATS418_CSVision/tree/main/samplecsvs" target="_blank">GitHub repository's samplecsvs folder</a>:</p>
+                    <ul>
+                        <li><strong>testsample.csv</strong>: Used for testing the summarization feature
+                            <ul>
+                                <li>Select "text" as the column to process</li>
+                                <li>Use "Trip Report Analysis" prompt template</li>
+                            </ul>
+                        </li>
+                        <li><strong>summarizedsample.csv</strong>: Used for testing the classification feature
+                            <ul>
+                                <li>Select "Summary" as the column to process</li>
+                                <li>Use "Trip Report Classification" prompt template</li>
+                            </ul>
+                        </li>
+                        <li><strong>classified_sample_full.csv</strong>: Used for testing the analysis feature
+                            <ul>
+                                <li>⚠️ Contains 570 entries - avoid running analysis/classification to preserve API credits</li>
+                                <li>In Analysis mode, select predictor and outcome variables</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="instruction-section">
+                    <h3>🔑 API Key Information</h3>
+                    <p>The default API key is linked to a demo account with limited credits (~$3 remaining as of 6/2/2025).</p>
+                    <p>To use your own OpenAI API key:</p>
+                    <ul>
+                        <li>Enter it directly in the dashboard's API Key field, or</li>
+                        <li>Modify the <code>.env</code> file in the project root</li>
+                    </ul>
+                    <p><em>Note: Get your API key from the <a href="https://platform.openai.com/account/api-keys" target="_blank">OpenAI dashboard</a></em></p>
+                </section>
+
+                <section class="instruction-section">
+                    <h3>📖 Additional Resources</h3>
+                    <ul>
+                        <li><a href="https://github.com/yangong17/STATS418_CSVision" target="_blank">Full Documentation on GitHub</a></li>
+                    </ul>
+                </section>
+            </div>
+        </div>
+    </div>
 
     <!-- Progress Steps -->
     <div class="steps">
@@ -1208,6 +1458,17 @@
             <div class="analysis-section">
                 <h3>Distribution Analysis</h3>
                 <div id="distribution-grid" class="distribution-grid"></div>
+            </div>
+
+            <div class="analysis-section">
+                <h3>Scatter Plots with Outcome Variable</h3>
+                <div class="scatter-controls">
+                    <label class="loess-toggle">
+                        <input type="checkbox" id="show-loess" onchange="toggleLoessLines()">
+                        Show LOESS Trend Lines
+                    </label>
+                </div>
+                <div id="scatter-grid" class="scatter-grid"></div>
             </div>
         </div>
     </div>
@@ -1794,6 +2055,9 @@
                     
                     // Display distribution plots
                     displayDistributions(data.distributions);
+
+                    // Display scatter plots
+                    displayScatterPlots(data.scatter_data, selectedOutcome);
                 } else {
                     alert('Error running analysis: ' + data.message);
                 }
@@ -1950,8 +2214,197 @@
             });
         }
 
+        function displayScatterPlots(scatterData, outcome) {
+            const container = document.getElementById('scatter-grid');
+            container.innerHTML = ''; // Clear previous plots
+            
+            // Create a plot for each predictor variable
+            Object.entries(scatterData).forEach(([predictor, data]) => {
+                const plotDiv = document.createElement('div');
+                plotDiv.className = 'scatter-plot';
+                plotDiv.innerHTML = `<div id="scatter-${predictor}" style="height: 400px;"></div>`;
+                container.appendChild(plotDiv);
+                
+                // Add small random jitter to y values to show overlapping points
+                const jitteredY = data.y.map(y => y + (Math.random() - 0.5) * 0.2);
+                
+                // Create scatter plot
+                const trace = {
+                    x: data.x,
+                    y: jitteredY,
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: 'Data Points',
+                    marker: {
+                        color: 'rgba(52, 152, 219, 0.5)',  // Softer blue with transparency
+                        size: 8,
+                        line: {
+                            color: 'rgba(52, 152, 219, 0.8)',
+                            width: 1
+                        }
+                    },
+                    hovertemplate: `
+                        ${predictor}: %{x}<br>
+                        ${outcome}: %{text}<br>
+                        <extra></extra>
+                    `,
+                    text: data.y.map(y => y.toFixed(1))  // Original (non-jittered) y values for hover
+                };
+
+                // Calculate LOESS line with improved smoothing
+                let traces = [trace];
+                if (document.getElementById('show-loess').checked) {
+                    const loessTrace = calculateLoessLine(data.x, data.y);
+                    traces.push(loessTrace);
+                }
+                
+                // Calculate basic statistics for annotations
+                const correlation = calculateCorrelation(data.x, data.y);
+                const correlationText = correlation.toFixed(2);
+                const relationshipStrength = Math.abs(correlation) < 0.2 ? 'weak' : 
+                                          Math.abs(correlation) < 0.4 ? 'moderate' :
+                                          'strong';
+                const relationshipDirection = correlation > 0 ? 'positive' : 'negative';
+                
+                Plotly.newPlot(`scatter-${predictor}`, traces, {
+                    title: {
+                        text: `Relationship between ${predictor} and ${outcome}`,
+                        font: { size: 16, color: '#2c3e50' }
+                    },
+                    xaxis: {
+                        title: {
+                            text: predictor,
+                            font: { size: 14, color: '#2c3e50' }
+                        },
+                        tickfont: { size: 12 },
+                        gridcolor: '#f5f5f5'
+                    },
+                    yaxis: {
+                        title: {
+                            text: outcome,
+                            font: { size: 14, color: '#2c3e50' }
+                        },
+                        tickfont: { size: 12 },
+                        gridcolor: '#f5f5f5',
+                        range: [Math.min(...data.y) - 0.5, Math.max(...data.y) + 0.5]  // Add padding to show jitter
+                    },
+                    margin: {
+                        l: 60,
+                        r: 30,
+                        t: 50,
+                        b: 60
+                    },
+                    showlegend: true,
+                    legend: {
+                        x: 0.02,
+                        y: 0.98,
+                        bgcolor: 'rgba(255, 255, 255, 0.8)'
+                    },
+                    annotations: [{
+                        x: 0.02,
+                        y: -0.18,
+                        xref: 'paper',
+                        yref: 'paper',
+                        text: `Correlation: ${correlationText} (${relationshipStrength} ${relationshipDirection} relationship)`,
+                        showarrow: false,
+                        font: {
+                            size: 12,
+                            color: '#666'
+                        }
+                    }],
+                    plot_bgcolor: 'white',
+                    paper_bgcolor: 'white',
+                    height: 400
+                }, {
+                    responsive: true,
+                    displayModeBar: false  // Hide the modebar for cleaner look
+                });
+            });
+        }
+
+        function calculateCorrelation(x, y) {
+            const n = x.length;
+            const meanX = x.reduce((a, b) => a + b) / n;
+            const meanY = y.reduce((a, b) => a + b) / n;
+            
+            const sdX = Math.sqrt(x.reduce((a, b) => a + Math.pow(b - meanX, 2), 0) / n);
+            const sdY = Math.sqrt(y.reduce((a, b) => a + Math.pow(b - meanY, 2), 0) / n);
+            
+            const covariance = x.reduce((a, b, i) => a + (b - meanX) * (y[i] - meanY), 0) / n;
+            
+            return covariance / (sdX * sdY);
+        }
+
+        function calculateLoessLine(x, y) {
+            // Sort x and y values
+            const indices = Array.from(Array(x.length).keys());
+            indices.sort((a, b) => x[a] - x[b]);
+            const sortedX = indices.map(i => x[i]);
+            const sortedY = indices.map(i => y[i]);
+            
+            // Calculate moving average with weighted window
+            const windowSize = Math.max(Math.floor(x.length * 0.3), 7); // Increased window size for smoother line
+            const smoothedY = [];
+            const smoothedX = [];
+            
+            for (let i = 0; i < sortedX.length - windowSize; i += Math.max(1, Math.floor(windowSize/6))) {
+                const windowX = sortedX.slice(i, i + windowSize);
+                const windowY = sortedY.slice(i, i + windowSize);
+                
+                // Calculate weighted average (triangular weights)
+                let weightedSum = 0;
+                let weightSum = 0;
+                for (let j = 0; j < windowSize; j++) {
+                    const weight = 1 - Math.abs(j - windowSize/2)/(windowSize/2);
+                    weightedSum += windowY[j] * weight;
+                    weightSum += weight;
+                }
+                
+                smoothedX.push(windowX[Math.floor(windowSize/2)]);
+                smoothedY.push(weightedSum / weightSum);
+            }
+            
+            return {
+                x: smoothedX,
+                y: smoothedY,
+                mode: 'lines',
+                type: 'scatter',
+                name: 'Trend Line',
+                line: {
+                    color: 'rgba(231, 76, 60, 0.8)',  // Softer red
+                    width: 3,
+                    shape: 'spline'  // Make the line smoother
+                }
+            };
+        }
+
+        function toggleLoessLines() {
+            const showLoess = document.getElementById('show-loess').checked;
+            // Re-run the analysis to update plots
+            runAnalysis();
+        }
+
         function updateModeStyles(mode) {
             document.body.setAttribute('data-active-mode', mode);
+        }
+
+        // Add to existing scripts at the end of the file
+        function showInstructions() {
+            document.getElementById('instructionsModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';  // Prevent background scrolling
+        }
+
+        function hideInstructions() {
+            document.getElementById('instructionsModal').style.display = 'none';
+            document.body.style.overflow = 'auto';  // Restore scrolling
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('instructionsModal');
+            if (event.target == modal) {
+                hideInstructions();
+            }
         }
     </script>
 
