@@ -10,11 +10,22 @@ from collections import OrderedDict
 import json
 from datetime import datetime, timedelta
 import requests
+import tempfile
+from pathlib import Path
 
 # === Load Environment Variables ===
-load_dotenv()
+load_dotenv()  # This will still work but won't override existing env vars
 
 # === Constants ===
+# Use temp directories for Docker/Cloud compatibility
+UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', tempfile.gettempdir())
+OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER', tempfile.gettempdir())
+
+# Ensure temp directories exist
+Path(UPLOAD_FOLDER).mkdir(parents=True, exist_ok=True)
+Path(OUTPUT_FOLDER).mkdir(parents=True, exist_ok=True)
+
+# === Model Pricing Constants ===
 MODEL_PRICING = {
     'gpt-4.1': {
         'display_name': 'GPT-4.1 ($2.00/$8.00 per 1M tokens)',
@@ -198,10 +209,6 @@ Text:
 # === Flask Setup ===
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Needed for session management, not authentication
-UPLOAD_FOLDER = 'uploads'
-OUTPUT_FOLDER = 'outputs'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 def get_billing_info():
     try:
@@ -472,18 +479,24 @@ def upload_file():
     
     file = request.files['csv_file']
     if file:
-        filename = secure_filename(file.filename)
-        path = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(path)
-        session['csv_path'] = path
-        
-        # Load columns
         try:
+            filename = secure_filename(file.filename)
+            path = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(path)
+            session['csv_path'] = path
+            
+            # Load columns
             df = pd.read_csv(path)
             session['columns'] = df.columns.tolist()
+            
+            # Log successful upload
+            app.logger.info(f"File uploaded successfully: {filename}")
+            return redirect(url_for('index'))
+            
         except Exception as e:
-            return f"Error loading CSV: {str(e)}"
-        
+            app.logger.error(f"Error uploading file: {str(e)}")
+            return f"Error uploading file: {str(e)}", 400
+    
     return redirect(url_for('index'))
 
 @app.route('/update_column', methods=['POST'])
@@ -678,145 +691,162 @@ def update_cost_stats():
             'message': str(e)
         })
 
+def generate_response(prompt, client, model):
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+        )
+        return {"status": "success", "result": response.choices[0].message.content.strip()}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "error_type": type(e).__name__}
+
 @app.route('/process', methods=['GET', 'POST'])
 def process():
-    if not is_api_key_valid():
-        return "Please set your OpenAI API key first", 400
-        
-    try:
-        df = pd.read_csv(session['csv_path'])
-        col = session['selected_column']
-        mode = request.args.get('mode', 'summarize')  # Get mode from request parameters
-        
-        # Handle both GET and POST methods
-        if request.method == 'POST':
-            prompt_template = request.form['custom_prompt']
-        else:
-            prompt_template = request.args.get('custom_prompt')
-        
-        if not prompt_template:
-            return "No prompt template provided", 400
-        
-        api_key = os.getenv('OPENAI_API_KEY')
-        model = os.getenv('MODEL', 'gpt-4.1')
-        
-        print(f"Initializing OpenAI client with model: {model}")
-        print(f"API key present: {'Yes' if api_key else 'No'}")
-        
-        # Create a client using the new OpenAI format
+    def generate():
         try:
-            client = openai.OpenAI(api_key=api_key)
-            # Test the connection
-            client.models.list()
-            print("OpenAI client initialized successfully")
-        except Exception as e:
-            print(f"Error initializing OpenAI client: {str(e)}")
-            print(f"Error type: {type(e)}")
-            return f"Error initializing OpenAI client: {str(e)}", 500
+            # Initial API key validation
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key or not api_key.strip():
+                yield f"data: {json.dumps({'error': 'No API key found in environment'})}\n\n"
+                return
 
-        results = []
-        parsed_results = []  # For classification mode
-        total_rows = len(df[col])
-        output_filename = f'{mode}_output.csv'
-        
-        def generate_response(prompt):
+            # Test OpenAI connection
+            yield f"data: {json.dumps({'status': 'info', 'message': f'Testing OpenAI connection with API key: {mask_api_key(api_key)}'})}\n\n"
+            
             try:
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.5,
-                )
-                return response.choices[0].message.content.strip()
+                client = openai.OpenAI(api_key=api_key)
+                client.models.list()
+                yield f"data: {json.dumps({'status': 'success', 'message': 'OpenAI connection test successful'})}\n\n"
             except Exception as e:
-                print(f"Error in LLM call: {str(e)}")
-                return f"LLM ERROR: {str(e)}"
+                error_msg = f"OpenAI connection test failed: {str(e)} (Type: {type(e).__name__})"
+                yield f"data: {json.dumps({'error': error_msg})}\n\n"
+                return
 
-        # Create SSE response
-        def generate():
+            # Load and validate data
+            if 'csv_path' not in session:
+                yield f"data: {json.dumps({'error': 'No CSV file loaded'})}\n\n"
+                return
+
+            df = pd.read_csv(session['csv_path'])
+            col = session['selected_column']
+            mode = request.args.get('mode', 'summarize')
+            
+            # Get prompt template
+            if request.method == 'POST':
+                prompt_template = request.form['custom_prompt']
+            else:
+                prompt_template = request.args.get('custom_prompt')
+            
+            if not prompt_template:
+                yield f"data: {json.dumps({'error': 'No prompt template provided'})}\n\n"
+                return
+
+            # Initialize OpenAI client
+            model = os.getenv('MODEL', 'gpt-4.1')
+            yield f"data: {json.dumps({'status': 'info', 'message': f'Initializing OpenAI client with model: {model}'})}\n\n"
+            yield f"data: {json.dumps({'status': 'info', 'message': f'API key present: {"Yes" if api_key else "No"}'})}\n\n"
+
+            results = []
+            parsed_results = []
+            total_rows = len(df[col])
+            output_filename = f'{mode}_output.csv'
+
             for i, row in enumerate(df[col]):
                 try:
-                    print(f"→ Processing row {i + 1} of {total_rows}")
                     prompt = prompt_template.replace('{csv column input}', str(row))
                     
-                    # Get LLM response
-                    result = generate_response(prompt)
-                    results.append(result)
+                    # Get LLM response with enhanced error handling
+                    response = generate_response(prompt, client, model)
                     
-                    # For classification mode, validate and parse the result
-                    if mode == 'classify':
-                        parsed = parse_classification_result(result)
-                        if parsed is None:
-                            error_msg = "Invalid classification format. Expected format: Category: Score"
-                            yield f"data: {json.dumps({'error': error_msg})}\n\n"
-                            parsed_results.append({})  # Add empty dict to maintain row alignment
-                        else:
-                            parsed_results.append(parsed)
-                    
-                    # Send progress and result
-                    progress = {
-                        'current': i + 1,
-                        'total': total_rows,
-                        'result': result,
-                        'status': 'processing'
-                    }
-                    yield f"data: {json.dumps(progress)}\n\n"
+                    if response["status"] == "error":
+                        error_msg = f"Error processing row {i + 1}: {response['error']} (Type: {response['error_type']})"
+                        yield f"data: {json.dumps({'error': error_msg})}\n\n"
+                        results.append(f"ERROR: {error_msg}")
+                        if mode == 'classify':
+                            parsed_results.append({})
+                    else:
+                        result = response["result"]
+                        results.append(result)
+                        
+                        if mode == 'classify':
+                            parsed = parse_classification_result(result)
+                            if parsed is None:
+                                error_msg = "Invalid classification format. Expected format: Category: Score"
+                                yield f"data: {json.dumps({'error': error_msg})}\n\n"
+                                parsed_results.append({})
+                            else:
+                                parsed_results.append(parsed)
+                        
+                        # Send progress
+                        progress = {
+                            'current': i + 1,
+                            'total': total_rows,
+                            'result': result,
+                            'status': 'processing'
+                        }
+                        yield f"data: {json.dumps(progress)}\n\n"
                     
                 except Exception as e:
-                    print(f"❌ Error on row {i+1}:", e)
-                    traceback.print_exc()
-                    error_msg = str(e)
+                    error_msg = f"Error on row {i+1}: {str(e)} (Type: {type(e).__name__})"
+                    yield f"data: {json.dumps({'error': error_msg})}\n\n"
                     results.append(f"ERROR: {error_msg}")
                     if mode == 'classify':
                         parsed_results.append({})
-                    yield f"data: {json.dumps({'error': error_msg})}\n\n"
 
-            # Add results to dataframe
-            if mode == 'classify':
-                # Get all unique categories
-                categories = set()
-                for result in parsed_results:
-                    categories.update(result.keys())
+            # Save results to dataframe
+            try:
+                if mode == 'classify':
+                    categories = set()
+                    for result in parsed_results:
+                        categories.update(result.keys())
+                    
+                    for category in categories:
+                        column_name = category.title()
+                        df[column_name] = [result.get(category, None) for result in parsed_results]
+                    
+                    df['Raw_Output'] = results
+                else:
+                    df['Summary'] = results
+
+                os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+                out_path = os.path.join(OUTPUT_FOLDER, output_filename)
+                df.to_csv(out_path, index=False)
                 
-                # Create columns for each category
-                for category in categories:
-                    column_name = category.title()  # Capitalize first letter
-                    df[column_name] = [result.get(category, None) for result in parsed_results]
+                completion_data = {
+                    'status': 'complete',
+                    'file': f'/download/{output_filename}',
+                    'mode': mode
+                }
+                yield f"data: {json.dumps(completion_data)}\n\n"
                 
-                # Add raw output column
-                df['Raw_Output'] = results
-            else:
-                df['Summary'] = results
+            except Exception as e:
+                error_msg = f"Error saving results: {str(e)} (Type: {type(e).__name__})"
+                yield f"data: {json.dumps({'error': error_msg})}\n\n"
 
-            # Save file
-            os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-            out_path = os.path.join(OUTPUT_FOLDER, output_filename)
-            df.to_csv(out_path, index=False)
-            
-            # Send completion message with download path
-            completion_data = {
-                'status': 'complete',
-                'file': f'/download/{output_filename}',
-                'mode': mode
-            }
-            
-            yield f"data: {json.dumps(completion_data)}\n\n"
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)} (Type: {type(e).__name__})"
+            yield f"data: {json.dumps({'error': error_msg})}\n\n"
 
-        return Response(generate(), mimetype='text/event-stream')
-
-    except Exception as e:
-        traceback.print_exc()
-        return f"Error during processing: {str(e)}", 400
+    return Response(generate(), mimetype='text/event-stream')
 
 @app.route('/download/<filename>')
 def download_file(filename):
     try:
+        file_path = os.path.join(OUTPUT_FOLDER, filename)
+        if not os.path.exists(file_path):
+            app.logger.error(f"File not found: {file_path}")
+            return "File not found", 404
+            
         return send_file(
-            os.path.join(OUTPUT_FOLDER, filename),
+            file_path,
             as_attachment=True,
             download_name=filename,
             mimetype='text/csv'
         )
     except Exception as e:
+        app.logger.error(f"Error downloading file: {str(e)}")
         return f"Error downloading file: {str(e)}", 404
 
 @app.route('/run_analysis', methods=['POST'])
@@ -881,4 +911,15 @@ def run_analysis():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Get port from environment variable for Cloud Run compatibility
+    port = int(os.getenv('PORT', 8080))
+    
+    # Log startup configuration
+    app.logger.info(f"Starting server on port {port}")
+    app.logger.info(f"Upload folder: {UPLOAD_FOLDER}")
+    app.logger.info(f"Output folder: {OUTPUT_FOLDER}")
+    app.logger.info(f"OpenAI API Key present: {'Yes' if os.getenv('OPENAI_API_KEY') else 'No'}")
+    app.logger.info(f"Model: {os.getenv('MODEL', 'gpt-4.1')}")
+    
+    # Run the app
+    app.run(host='0.0.0.0', port=port)
