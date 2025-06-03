@@ -1139,7 +1139,6 @@
         .help-button:hover {
             background: #f1f5f9;
             border-color: #cbd5e1;
-            transform: translateY(-1px);
         }
 
         .modal {
@@ -1321,6 +1320,56 @@
             background: #f5f5f5;
             border-radius: 4px;
         }
+
+        /* Replace the sparkle animation with rainbow glow */
+        @keyframes rainbow-glow {
+            0% { box-shadow: 0 0 15px 5px rgba(238, 130, 238, 0.4); }
+            20% { box-shadow: 0 0 15px 5px rgba(75, 0, 130, 0.4); }
+            40% { box-shadow: 0 0 15px 5px rgba(0, 0, 255, 0.4); }
+            60% { box-shadow: 0 0 15px 5px rgba(0, 255, 0, 0.4); }
+            80% { box-shadow: 0 0 15px 5px rgba(255, 165, 0, 0.4); }
+            100% { box-shadow: 0 0 15px 5px rgba(255, 0, 0, 0.4); }
+        }
+
+        .help-button.sparkle {
+            animation: rainbow-glow 2s linear infinite;
+        }
+
+        @keyframes rainbow-glow {
+            0% { box-shadow: 0 0 15px 5px rgba(238, 130, 238, 0.4); }
+            20% { box-shadow: 0 0 15px 5px rgba(75, 0, 130, 0.4); }
+            40% { box-shadow: 0 0 15px 5px rgba(0, 0, 255, 0.4); }
+            60% { box-shadow: 0 0 15px 5px rgba(0, 255, 0, 0.4); }
+            80% { box-shadow: 0 0 15px 5px rgba(255, 165, 0, 0.4); }
+            100% { box-shadow: 0 0 15px 5px rgba(255, 0, 0, 0.4); }
+        }
+
+        .help-button:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+
+        /* Update the question mark icon */
+        <button onclick="showInstructions()" class="help-button">
+            <img src="{{ url_for('static', filename='images/Icon-round-Question_mark.svg') }}" alt="?" width="24" height="24">
+            Instructions
+        </button>
+
+        /* Update the Sample Data section header */
+        <section class="instruction-section">
+            <h3>📦 Sample Data</h3>
+            <p>You can find sample CSV files in the <a href="https://github.com/yangong17/STATS418_CSVision/tree/main/samplecsvs" target="_blank">GitHub repository's samplecsvs folder</a>:</p>
+        </section>
+
+        .help-button svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .help-button svg path {
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
     </style>
 </head>
 <body>
@@ -1328,11 +1377,7 @@
         <img src="{{ url_for('static', filename='images/csvision-logo.png') }}" alt="CSVision Logo" class="app-logo">
         <h1 class="app-title">CSVision</h1>
         <button onclick="showInstructions()" class="help-button">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                <line x1="12" y1="17" x2="12" y2="17"></line>
-            </svg>
+            <img src="{{ url_for('static', filename='images/Icon-round-Question_mark.svg') }}" alt="?" width="24" height="24">
             Instructions
         </button>
     </div>
@@ -1355,7 +1400,39 @@
                 </section>
 
                 <section class="instruction-section">
-                    <h3>📊 Sample Data</h3>
+                    <h3>🔄 Understanding Modes</h3>
+                    <p>CSVision offers three distinct modes of operation:</p>
+
+                    <h4>📝 Summarization Mode</h4>
+                    <ul>
+                        <li>Transforms unstructured text into organized, summarized formats</li>
+                        <li>Uses customizable prompt templates to guide the summarization process</li>
+                        <li>Allows full customization of the prompt template through the editing box</li>
+                    </ul>
+
+                    <h4>🏷️ Classification Mode</h4>
+                    <ul>
+                        <li>Converts text into numerical variables based on defined categories</li>
+                        <li><strong>Important:</strong> The prompt template must include labels in a specific format:</li>
+                        <li>Required format:
+                            <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin: 10px 0;">Example:
+Label 1: score
+Label 2: score
+Label 3: score</pre>
+                        </li>
+                        <li>The program uses the labels between "Example:" and the next line break to create column names in the output file</li>
+                    </ul>
+
+                    <h4>📊 Analysis Mode</h4>
+                    <ul>
+                        <li>Creates visualizations and statistical analysis of variables in your data</li>
+                        <li>Generates correlation matrices, distribution plots, and scatter plots</li>
+                        <li><em>Tip: For clearer and wider scatter plots, limit predictor variables to 1</em></li>
+                    </ul>
+                </section>
+
+                <section class="instruction-section">
+                    <h3>📦 Sample Data</h3>
                     <p>You can find sample CSV files in the <a href="https://github.com/yangong17/STATS418_CSVision/tree/main/samplecsvs" target="_blank">GitHub repository's samplecsvs folder</a>:</p>
                     <ul>
                         <li><strong>testsample.csv</strong>: Used for testing the summarization feature
@@ -2473,6 +2550,10 @@
         function showInstructions() {
             document.getElementById('instructionsModal').style.display = 'block';
             document.body.style.overflow = 'hidden';  // Prevent background scrolling
+            // Remove sparkle effect after first click
+            document.querySelector('.help-button').classList.remove('sparkle');
+            // Store in localStorage that user has seen instructions
+            localStorage.setItem('hasSeenInstructions', 'true');
         }
 
         function hideInstructions() {
@@ -2487,6 +2568,35 @@
                 hideInstructions();
             }
         }
+
+        // Add this to your DOMContentLoaded event listener
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add sparkle effect if user hasn't seen instructions
+            if (!localStorage.getItem('hasSeenInstructions')) {
+                document.querySelector('.help-button').classList.add('sparkle');
+            }
+            // ... rest of your existing DOMContentLoaded code ...
+        });
+
+        // Initialize sparkle effect
+        document.addEventListener('DOMContentLoaded', function() {
+            const customPrompt = document.getElementById('custom-prompt');
+            if (customPrompt) {
+                customPrompt.addEventListener('input', function() {
+                    updatePromptPreview(this.value);
+                    updateCostStats(this.value);
+                });
+            }
+
+            // Add sparkle effect if user hasn't seen instructions
+            if (!localStorage.getItem('hasSeenInstructions')) {
+                document.querySelector('.help-button').classList.add('sparkle');
+            }
+
+            // Initialize first preview tab
+            showTab(0);
+            updateCostStats();
+        });
     </script>
 
     <!-- Add Plotly.js for distribution plots -->

@@ -58,14 +58,15 @@ SAMPLE_PROMPTS = {
         }),
         ('trip_report', {
             'name': 'Trip Report Analysis',
-            'template': '''Act as my research assistant in psychedelic medicine. I will provide you with a first-person psychedelic trip report. Your task is to summarize it using the structure below:
+            'template': '''Assume the role of a research scientist studying psychedelic therapy. I will provide you with a first-person psychedelic trip report. Your task is to summarize it using the structure below:
 
 Trip Report:
 {csv column input}
 
-End of trip report. As my research assistant, here is the format of the summary I want you to write for me:
+End of trip report. As a research scientist please write a summary of the trip report you just read. Here is the structure of the summary I want you to write for me:
 
 Structure:
+
 1. A brief overview of the experience in bullet points
 2. Descriptions of the following details, each with:
     - A description bullet point, about 3-5 sentences each.
@@ -82,24 +83,25 @@ Control/Environmental Safety Level
 - Quote: "..."
 
 Contextual Understanding
-- How much guiding mental, spiritual, or philosophical framework did the user have going into the trip?
+- Did the user have a mental, spiritual, or philosophical framework guiding the experience?
 - Quote: "..."
 
 Intention
-- Did they have a specific reason or goal? Was preparation involved?
+- Was there a clear purpose, reason, or goal for taking the substance? Was there any preparation?
 - Quote: "..."
 
 Outcome
-- Was the experience positive, negative, or mixed?
+- How did the user describe the experience overall? Was it positive, negative, or mixed?
 - Quote: "..."
 
 Integration Practice
-- Efforts to integrate afterward?
+- Did the user reflect on or apply the experience afterward (e.g., journaling, discussing, changing behavior)?
 - Quote: "..." or "No integration practices were mentioned."
 
 Important Notes:
 - Use bullet points for both the description and its corresponding quote.
-- Accuracy is HIGHLY IMPORTANT - include only what is explicitly stated.'''
+- Accuracy is HIGHLY IMPORTANT - include only what is explicitly stated.
+-  If a quote is missing or unclear, say so explicitly rather than guessing'''
         }),
         ('bullet_points', {
             'name': 'Bullet Point Summary',
