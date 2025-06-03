@@ -184,57 +184,44 @@ Impact: 3'''
         }),
         ('trip_report', {
             'name': 'Trip Report Classification',
-            'template': '''You are analyzing a summarized psychedelic trip report, which contains the following sections: Experience Level, Control/Environmental Safety Level, Contextual Understanding, Intention, Integration Practice, and Outcome.
+            'template': '''You are analyzing a summarized psychedelic trip report with the following categories: Experience, Control, Context, Intention, Integration, and Outcome.
 
-Your task is to assign numeric scores to each of these categories based on the content of the summary. Use the anchor descriptions below as a rubric to standardize your ratings, especially focusing on scores 1 (low), 3 (moderate), and 5 (high).
+Rate each on a scale (1–5), except Integration (0 or 1), using the criteria below. Use only explicitly stated information; if unclear, default to a lower score.
 
-Scoring Guidelines:
+Scoring Rubric:
+
 Experience (1–5)
-How experienced is the author with psychedelics?
-
-1 – First-time or very inexperienced; explicitly states it's their first or second time.
-3 – Moderate experience; has used psychedelics a few times, with some familiarity.
-5 – Highly experienced; repeated use over time, demonstrates fluency in terminology or practices.
+How familiar is the author with psychedelics?
+• 1: First-time or very new
+• 5: Extensive use, fluency in psychedelic terms or practices
 
 Control / Environmental Safety (1–5)
-How much control or safety did they have in their setting?
+How safe and intentional was the setting?
+• 1: Chaotic or unsafe
+• 5: Carefully planned, supportive environment
 
-1 – Chaotic or unsafe setting; peer pressure, no preparation, unexpected events.
-3 – Mixed environment; some planning but minor disruptions or lack of supervision.
-5 – Fully intentional and safe; planned set and setting, possibly guided, supportive surroundings.
-
-Contextual Understanding (1–5)
-How strong was their guiding framework (philosophy, spirituality, therapeutic lens)?
-
-1 – No context; took the substance without a clear reason or framework.
-3 – Some awareness; references general curiosity or healing goals without depth.
-5 – Clear and deep framework; describes specific beliefs, spiritual practices, or therapeutic models.
+Context (1–5)
+Was there a guiding framework (e.g., spiritual, therapeutic)?
+• 1: None
+• 5: Clear, specific framework or belief system
 
 Intention (1–5)
-How clearly did the author state their purpose for the trip?
+Did the author have a clear purpose?
+• 1: None stated
+• 5: Strong, specific intention (e.g., healing, growth)
 
-1 – No clear intention; used impulsively or recreationally without stated reason.
-3 – Vague or mixed intention; curiosity or general self-exploration.
-5 – Strong, well-defined intention; healing trauma, spiritual growth, therapy, etc.
-
-Integration Practice (0 or 1)
-Did the author take steps to reflect on or apply their experience afterward?
-
-0 – No mention of integration; no signs of journaling, reflection, or life changes.
-1 – Integration effort described; mentions discussing with others, journaling, lifestyle changes, or applying lessons learned.
+Integration (0 or 1)
+Did they reflect or apply insights afterward?
+• 0: No integration
+• 1: Evidence of reflection or lifestyle change
 
 Outcome (1–5)
-How positive or negative was the experience overall?
-
-1 – Overwhelmingly negative or traumatic; described as distressing, disorienting, or harmful.
-3 – Mixed or neutral; some insight or pleasant moments but also challenges or confusion.
-5 – Deeply positive and transformative; described as healing, life-changing, or profoundly meaningful.
+How positive or negative was the experience?
+• 1: Overwhelmingly negative
+• 5: Deeply positive and meaningful
 
 Trip Summary to analyze:
 {csv column input}
-
-Instructions:
-Please rate each category using the rubric above. Use only explicitly stated information in the summary and avoid making assumptions. If information is ambiguous or missing, default to the most conservative (lower) rating.
 
 Respond in the following exact format (labels plus number, one per line, no extra text):
 
