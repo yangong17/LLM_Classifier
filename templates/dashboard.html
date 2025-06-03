@@ -56,12 +56,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 25px;  /* Increased gap slightly */
+            gap: 25px;
+            position: relative;  /* Add this */
+            padding: 0 100px;    /* Add this to account for help button width */
         }
 
         .app-logo {
-            width: 65px;  /* Increased from 50px */
-            height: 65px;  /* Increased from 50px */
+            width: 65px;
+            height: 65px;
             object-fit: contain;
         }
 
@@ -1115,6 +1117,10 @@
 
         /* Add to existing styles */
         .help-button {
+            position: absolute;  /* Change this */
+            right: 0;           /* Add this */
+            top: 50%;          /* Add this */
+            transform: translateY(-50%);  /* Add this */
             display: flex;
             align-items: center;
             gap: 8px;
@@ -1127,7 +1133,7 @@
             transition: all 0.2s ease;
             font-size: 0.9em;
             font-weight: 500;
-            margin-left: auto;
+            margin-left: 0;  /* Remove margin-left auto */
         }
 
         .help-button:hover {
