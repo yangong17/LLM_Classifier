@@ -1,29 +1,30 @@
-# Use Python 3.9 slim image for smaller size
 FROM python:3.9-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install build dependencies and clean up in the same layer
 RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# Copy requirements first for better caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy the rest of the application
 COPY . .
 
-# Create temp directories with appropriate permissions
-RUN mkdir -p /tmp/uploads /tmp/outputs \
-    && chmod 777 /tmp/uploads /tmp/outputs
+# Create necessary directories
+RUN mkdir -p uploads outputs
 
 # Set environment variables
-ENV UPLOAD_FOLDER=/tmp/uploads
-ENV OUTPUT_FOLDER=/tmp/outputs
+ENV FLASK_APP=app.py
+ENV FLASK_ENV=production
 ENV PORT=8080
 
-# Use gunicorn for production
+# Expose port
+EXPOSE 8080
+
+# Run the application
 CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 app:app 
