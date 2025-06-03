@@ -1677,6 +1677,49 @@
         var selectedPredictors = new Set();
         var selectedOutcome = null;
 
+        function updatePromptTemplate() {
+            const select = document.getElementById('template-select');
+            const [category, key] = select.value.split('.');
+            const selectedTemplate = TEMPLATES[category][key];
+            
+            if (selectedTemplate) {
+                const template = selectedTemplate.template;
+                document.getElementById('custom-prompt').value = template;
+                updatePromptPreview(template);
+                updateCostStats(template);
+            }
+        }
+
+        function updatePromptPreview(template) {
+            const promptText = template || document.getElementById('custom-prompt').value;
+            
+            fetch('/update_prompt_preview', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ template: promptText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const previewElement = document.querySelector('.prompt-preview .preview-content');
+                    previewElement.innerHTML = data.preview;
+                }
+            });
+        }
+
+        // Add event listener for real-time updates when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            const customPrompt = document.getElementById('custom-prompt');
+            if (customPrompt) {
+                customPrompt.addEventListener('input', function() {
+                    updatePromptPreview(this.value);
+                    updateCostStats(this.value);
+                });
+            }
+        });
+
         function updateApiKey() {
             const apiKey = document.getElementById('api-key').value;
             fetch('/update_api_key', {
@@ -1939,27 +1982,6 @@
             if (previewElement.textContent !== 'No preview available') {
                 const template = document.getElementById('custom-prompt').value;
                 updatePromptPreviewWithData(template, csvData);
-            }
-        }
-
-        function updatePromptTemplate() {
-            const select = document.getElementById('template-select');
-            const [category, key] = select.value.split('.');
-            const selectedTemplate = TEMPLATES[category][key];
-            
-            if (selectedTemplate) {
-                const template = selectedTemplate.template;
-                document.getElementById('custom-prompt').value = template;
-                
-                // Get current CSV data
-                const activeTab = document.querySelector('.preview-content.active');
-                const csvData = activeTab ? activeTab.textContent : '';
-                
-                // Update preview with new template
-                updatePromptPreviewWithData(template, csvData);
-
-                // Update cost statistics with new template
-                updateCostStats(template);
             }
         }
 

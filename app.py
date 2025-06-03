@@ -126,29 +126,113 @@ Text:
     'classification': OrderedDict([
         ('default', {
             'name': 'Default Classification',
-            'template': '''Please classify the following text into these categories and assign a score from 1-5 for each (1=lowest, 5=highest). Return only labels and scores, one per line:
+            'template': '''Your task is to analyze and classify the following text across five key dimensions. Use the scoring guidelines below to assign scores from 1 to 5 for each category.
 
-Complexity: (technical/conceptual complexity)
-Clarity: (how clear and well-written)
-Relevance: (topic relevance)
-Actionability: (can be acted upon)
-Impact: (potential impact if acted upon)
+Scoring Guidelines:
 
-Text:
-{csv column input}'''
+Complexity (1-5)
+How technically or conceptually complex is the content?
+
+1 - Very simple; basic concepts that require no specialized knowledge
+3 - Moderate complexity; requires some domain knowledge or analytical thinking
+5 - Highly complex; requires deep expertise or handles multiple intricate concepts
+
+Clarity (1-5)
+How clear and well-written is the text?
+
+1 - Unclear or confusing; poor structure, grammar issues, or hard to follow
+3 - Moderately clear; some organization but could be more precise or better structured
+5 - Exceptionally clear; well-organized, precise language, easy to understand
+
+Relevance (1-5)
+How relevant is the content to its intended purpose/topic?
+
+1 - Not relevant; off-topic or tangential to the main subject
+3 - Moderately relevant; addresses the topic but includes unnecessary information
+5 - Highly relevant; focused and directly addresses the core topic
+
+Actionability (1-5)
+How easily can the information be acted upon?
+
+1 - Not actionable; purely theoretical or lacks practical application
+3 - Somewhat actionable; provides some guidance but requires additional information
+5 - Highly actionable; clear, specific steps or recommendations that can be implemented
+
+Impact (1-5)
+What is the potential impact if the information is acted upon?
+
+1 - Minimal impact; changes would be superficial or insignificant
+3 - Moderate impact; would lead to notable but not transformative changes
+5 - High impact; could lead to significant or transformative changes
+
+Text to analyze:
+{csv column input}
+
+Instructions:
+Rate each category using the rubric above. Use only explicitly stated information and avoid assumptions. If information is ambiguous or missing, default to the more conservative (lower) rating.
+
+Respond in the following exact format (labels plus number, one per line, no extra text):
+
+Example:
+Complexity: 4
+Clarity: 3
+Relevance: 5
+Actionability: 4
+Impact: 3'''
         }),
         ('trip_report', {
             'name': 'Trip Report Classification',
-            'template': '''You are analyzing a summarized psychedelic trip report. It contains sections such as Experience Level, Control/Environmental Safety Level, Contextual Understanding, Intention, Integration Practice, and Outcome.
+            'template': '''You are analyzing a summarized psychedelic trip report, which contains the following sections: Experience Level, Control/Environmental Safety Level, Contextual Understanding, Intention, Integration Practice, and Outcome.
 
-Assign a score to each of the following categories:
+Your task is to assign numeric scores to each of these categories based on the content of the summary. Use the anchor descriptions below as a rubric to standardize your ratings, especially focusing on scores 1 (low), 3 (moderate), and 5 (high).
 
-Experience: 1–5  
-Control: 1–5  
-Context: 1–5  
-Intention: 1–5  
-Integration: 1 if integration efforts were described, 0 otherwise  
-Outcome: 1–5  (1 = distressing/negative, 5 = positive/meaningful)
+Scoring Guidelines:
+Experience (1–5)
+How experienced is the author with psychedelics?
+
+1 – First-time or very inexperienced; explicitly states it's their first or second time.
+3 – Moderate experience; has used psychedelics a few times, with some familiarity.
+5 – Highly experienced; repeated use over time, demonstrates fluency in terminology or practices.
+
+Control / Environmental Safety (1–5)
+How much control or safety did they have in their setting?
+
+1 – Chaotic or unsafe setting; peer pressure, no preparation, unexpected events.
+3 – Mixed environment; some planning but minor disruptions or lack of supervision.
+5 – Fully intentional and safe; planned set and setting, possibly guided, supportive surroundings.
+
+Contextual Understanding (1–5)
+How strong was their guiding framework (philosophy, spirituality, therapeutic lens)?
+
+1 – No context; took the substance without a clear reason or framework.
+3 – Some awareness; references general curiosity or healing goals without depth.
+5 – Clear and deep framework; describes specific beliefs, spiritual practices, or therapeutic models.
+
+Intention (1–5)
+How clearly did the author state their purpose for the trip?
+
+1 – No clear intention; used impulsively or recreationally without stated reason.
+3 – Vague or mixed intention; curiosity or general self-exploration.
+5 – Strong, well-defined intention; healing trauma, spiritual growth, therapy, etc.
+
+Integration Practice (0 or 1)
+Did the author take steps to reflect on or apply their experience afterward?
+
+0 – No mention of integration; no signs of journaling, reflection, or life changes.
+1 – Integration effort described; mentions discussing with others, journaling, lifestyle changes, or applying lessons learned.
+
+Outcome (1–5)
+How positive or negative was the experience overall?
+
+1 – Overwhelmingly negative or traumatic; described as distressing, disorienting, or harmful.
+3 – Mixed or neutral; some insight or pleasant moments but also challenges or confusion.
+5 – Deeply positive and transformative; described as healing, life-changing, or profoundly meaningful.
+
+Trip Summary to analyze:
+{csv column input}
+
+Instructions:
+Please rate each category using the rubric above. Use only explicitly stated information in the summary and avoid making assumptions. If information is ambiguous or missing, default to the most conservative (lower) rating.
 
 Respond in the following exact format (labels plus number, one per line, no extra text):
 
@@ -158,38 +242,129 @@ Control: 3
 Context: 4  
 Intention: 5  
 Integration: 0  
-Outcome: 4
-
-Trip Summary:
-{csv column input}'''
+Outcome: 4'''
         }),
         ('sentiment', {
             'name': 'Sentiment Analysis',
-            'template': '''Analyze the sentiment of the following text and provide scores from 1-5 for each aspect. Return only labels and scores, one per line:
+            'template': '''Your task is to analyze the sentiment of the following text across four dimensions. Use the scoring guidelines below to assign appropriate scores.
 
-Positivity: (1=very negative, 5=very positive)
-Intensity: (1=mild, 5=strong)
-Objectivity: (1=very subjective, 5=very objective)
-Confidence: (1=low confidence, 5=high confidence)
+Scoring Guidelines:
 
-Text:
-{csv column input}'''
+Positivity (1-5)
+How positive or negative is the overall tone and content?
+
+1 - Very negative; predominantly critical, pessimistic, or expressing distress
+3 - Neutral; balanced mix of positive and negative elements
+5 - Very positive; predominantly optimistic, enthusiastic, or expressing satisfaction
+
+Intensity (1-5)
+How strong or intense are the expressed emotions and opinions?
+
+1 - Very mild; minimal emotional expression or passion
+3 - Moderate; clear but controlled emotional expression
+5 - Very intense; strong emotional language or passionate expression
+
+Objectivity (1-5)
+How objective or subjective is the content?
+
+1 - Very subjective; primarily personal opinions and feelings
+3 - Mixed; combines factual information with personal views
+5 - Very objective; focuses on facts and evidence with minimal bias
+
+Confidence (1-5)
+How confident or certain is the tone of the content?
+
+1 - Very uncertain; lots of hedging language or expressed doubt
+3 - Moderate confidence; some qualifications but generally assured
+5 - Very confident; strong assertions and definitive statements
+
+Text to analyze:
+{csv column input}
+
+Instructions:
+Rate each category using the rubric above. Use only explicitly stated information and avoid assumptions. If information is ambiguous or missing, default to the more conservative (lower) rating.
+
+Respond in the following exact format (labels plus number, one per line, no extra text):
+
+Example:
+Positivity: 4
+Intensity: 3
+Objectivity: 5
+Confidence: 4'''
         }),
         ('topic', {
             'name': 'Topic Classification',
-            'template': '''Classify the following text into these topic categories. For each category, assign a relevance score from 0-5 (0=not relevant, 5=highly relevant). Return only labels and scores, one per line:
+            'template': '''Your task is to classify the relevance of the following text to different topic areas. Use the scoring guidelines below to assign a relevance score from 0 to 5 for each category.
 
-Technology: 
-Business: 
-Science: 
-Politics: 
-Entertainment: 
-Health: 
-Education: 
-Other: 
+Scoring Guidelines:
 
-Text:
-{csv column input}'''
+For each category, rate the relevance as follows:
+0 - Not relevant at all; no connection to the topic
+1 - Minimal relevance; brief or indirect mentions
+2 - Slight relevance; some related concepts but not central
+3 - Moderate relevance; clear connection but not primary focus
+4 - High relevance; significant focus on the topic
+5 - Primary topic; central focus of the text
+
+Topic Categories:
+
+Technology
+- Hardware, software, digital systems, innovation
+- AI, programming, cybersecurity, digital transformation
+- Technical infrastructure, emerging tech trends
+
+Business
+- Corporate operations, management, strategy
+- Marketing, sales, finance, entrepreneurship
+- Industry analysis, market trends
+
+Science
+- Research, experiments, scientific methods
+- Natural sciences, physics, biology, chemistry
+- Scientific discoveries, academic findings
+
+Politics
+- Government, policy, legislation
+- Political movements, elections, democracy
+- International relations, public policy
+
+Entertainment
+- Media, arts, culture, recreation
+- Movies, music, games, sports
+- Celebrity news, lifestyle content
+
+Health
+- Medical information, wellness
+- Healthcare systems, treatments
+- Mental health, nutrition, fitness
+
+Education
+- Learning, teaching, academic content
+- Educational systems, methods
+- Training, skill development
+
+Other
+- Topics not fitting above categories
+- Miscellaneous or unique subjects
+- Cross-disciplinary content
+
+Text to analyze:
+{csv column input}
+
+Instructions:
+Rate each category using the rubric above. Use only explicitly stated information and avoid assumptions. If information is ambiguous or missing, default to the more conservative (lower) rating.
+
+Respond in the following exact format (labels plus number, one per line, no extra text):
+
+Example:
+Technology: 5
+Business: 3
+Science: 4
+Politics: 0
+Entertainment: 1
+Health: 2
+Education: 3
+Other: 1'''
         })
     ])
 }
@@ -903,6 +1078,45 @@ def run_analysis():
     except Exception as e:
         print(f"Error in analysis: {str(e)}")
         traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/update_prompt_preview', methods=['POST'])
+def update_prompt_preview():
+    try:
+        data = request.get_json()
+        template = data.get('template')
+        
+        if not template:
+            return jsonify({'status': 'error', 'message': 'No template provided'}), 400
+            
+        # Get current CSV data
+        if 'csv_path' not in session or 'selected_column' not in session:
+            return jsonify({'status': 'error', 'message': 'No CSV data available'}), 400
+            
+        df = pd.read_csv(session['csv_path'])
+        column = session['selected_column']
+        
+        if column not in df.columns:
+            return jsonify({'status': 'error', 'message': 'Selected column not found'}), 400
+            
+        # Get first entry
+        csv_data = str(df[column].iloc[0])
+        
+        # Replace placeholder with sample text
+        preview = template.replace('{csv column input}', csv_data)
+        
+        # Wrap the CSV data in a span for styling
+        preview_html = preview.replace(csv_data, f'<span class="csv-data">{csv_data}</span>')
+        
+        return jsonify({
+            'status': 'success',
+            'preview': preview_html
+        })
+        
+    except Exception as e:
         return jsonify({
             'status': 'error',
             'message': str(e)
