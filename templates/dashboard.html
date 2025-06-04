@@ -701,11 +701,27 @@
             background: #fff;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;  /* Added for positioning context */
         }
 
         .log-container h3 {
             margin-top: 0;
             color: #2c3e50;
+        }
+
+        .progress-info {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: #fff;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         #log-content {
@@ -1370,6 +1386,68 @@
             stroke-linecap: round;
             stroke-linejoin: round;
         }
+
+        .results-list {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .results-list h4 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+
+        .result-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .result-number {
+            flex: 0 0 40px;
+            font-weight: bold;
+            color: #6c757d;
+        }
+
+        .result-text {
+            flex: 1;
+            word-break: break-word;
+        }
+
+        .progress-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #e9ecef;
+        }
+
+        .progress-text {
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+
+        .progress-percentage {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+            padding: 6px 12px;
+            border-radius: 20px;
+            min-width: 70px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -1979,19 +2057,53 @@ Label 3: score</pre>
                 
                 if (data.status === 'complete') {
                     // Processing complete
-                    logContent.innerHTML += '<div class="success">✅ Processing complete!</div>';
+                    let html = '<div class="progress-info"><div class="progress-text">Processing Complete!</div><div class="progress-percentage">100%</div></div>';
+                    html += '<div class="success">✅ Processing complete!</div>';
                     if (data.file) {
-                        logContent.innerHTML += `<div class="download"><a href="${data.file}" download>Download Results</a></div>`;
+                        html += `<div class="download"><a href="${data.file}" download>Download Results</a></div>`;
                     }
+                    
+                    // Display all results
+                    if (data.all_results && data.all_results.length > 0) {
+                        html += '<div class="results-list"><h4>All Results:</h4>';
+                        data.all_results.forEach((result, index) => {
+                            html += `
+                                <div class="result-item">
+                                    <span class="result-number">#${index + 1}:</span>
+                                    <span class="result-text">${result}</span>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                    }
+                    
+                    logContent.innerHTML = html;
                     document.getElementById('process-button').disabled = false;
                     eventSource.close();
-                } else if (data.status === 'processing') {
-                    // Update progress
+                } else {
+                    // Update progress and show all results so far
                     const progress = Math.round((data.current / data.total) * 100);
-                    logContent.innerHTML = `
-                        <div>Processing: ${data.current} of ${data.total} (${progress}%)</div>
-                        <div class="result">Last result: ${data.result}</div>
+                    let html = `
+                        <div class="progress-info">
+                            <div class="progress-text">Processing: ${data.current} of ${data.total}</div>
+                            <div class="progress-percentage">${progress}%</div>
+                        </div>
                     `;
+                    
+                    if (data.all_results && data.all_results.length > 0) {
+                        html += '<div class="results-list"><h4>Results so far:</h4>';
+                        data.all_results.forEach((result, index) => {
+                            html += `
+                                <div class="result-item">
+                                    <span class="result-number">#${index + 1}:</span>
+                                    <span class="result-text">${result}</span>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                    }
+                    
+                    logContent.innerHTML = html;
                 }
                 
                 // Auto-scroll to bottom of log

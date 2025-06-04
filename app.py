@@ -944,11 +944,12 @@ def process():
                         else:
                             parsed_results.append(parsed)
                     
-                    # Send progress and result
+                    # Send progress and all results so far
                     progress = {
                         'current': i + 1,
                         'total': total_rows,
                         'result': result,
+                        'all_results': results,  # Include all results
                         'status': 'processing'
                     }
                     yield f"data: {json.dumps(progress)}\n\n"
@@ -984,11 +985,12 @@ def process():
             out_path = os.path.join(OUTPUT_FOLDER, output_filename)
             df.to_csv(out_path, index=False)
             
-            # Send completion message with download path
+            # Send completion message with download path and all results
             completion_data = {
                 'status': 'complete',
                 'file': f'/download/{output_filename}',
-                'mode': mode
+                'mode': mode,
+                'all_results': results  # Include all results in completion message
             }
             
             yield f"data: {json.dumps(completion_data)}\n\n"
