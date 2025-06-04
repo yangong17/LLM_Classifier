@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+uploads/
+outputs/
+.DS_Store
+*.log
+.git/
+venv/
+flask_session/
+*.csv
+README.md 
