@@ -2,6 +2,17 @@
 
 A Flask web application for CSV data analysis and processing, developed as my final project for STATS418 - "Tools in Data Science", UCLA MASDS Spring 2025
 
+**Check out a live demo here:**
+https://stats418-csvision-228019890474.us-central1.run.app
+
+**Note:** The default API key is linked to a demo account with limited credits (~$3 remaining as of 6/2/2025)
+
+To use your own OpenAI API key:
+
+* Enter it directly in the dashboard's API Key field, or
+* Modify the .env file in the project root
+
+
 ## Overview
 CSVision is designed to help data scientists and analysts convert unstructured text data (like job descriptions, news articles, or personal reflections) into structured, numerical data suitable for statistical analysis. It provides an end-to-end pipeline for text processing, classification, and analysis.
 
